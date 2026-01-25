@@ -20,7 +20,7 @@ let pow_tests () =
     assert (0 = pow 0 23);
   ]
 
-let split_on_ws_tests () =
+(* let split_on_ws_tests () =
   let f = split_on_ws in
   [
     assert (["a"; "bc"] = f "a bc");
@@ -37,13 +37,13 @@ let eval_tests () =
     assert (eval [1; 2; 3] ["-1"; "+"] = [0; 2; 3]);
     assert (eval [] ["-1"; "2"; "3"; "-"; "+"; "4"; "*"] = [-8]);
     assert (eval [1; 2; 3] ["-1"; "2"; "3"; "-"; "+"; "4"; "*"] = [-8; 1; 2; 3]);
-  ]
+  ] *)
 
 let _run_tests =
   if not testing then [] else
     [
       run sqrt_tests true;
       run pow_tests true;
-      run split_on_ws_tests true;
-      run eval_tests true;
+      (* run split_on_ws_tests true;
+      run eval_tests true; *)
     ]

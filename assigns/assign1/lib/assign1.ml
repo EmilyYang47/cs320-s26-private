@@ -1,9 +1,25 @@
 
-let sqrt (_n : int) : int = (* CHANGE _n to n! *)
-  assert false
+let sqrt (n : int) : int = 
+  let rec loop k = 
+    if n <= k * k 
+    then k 
+    else loop (k + 1) 
+  in loop 0 
 
-let pow (_n : int) (_k : int) : int = (* CHANGE _n to n and _k to k! *)
-  assert false
+let pow (n : int) (k : int) : int = 
+  (* first deal with the edge cases *)
+  if n = 1 
+  then n 
+  else if k = 0 
+  then 1
+  else if n = 0
+  then 0
+  (* now handle the general cases *)
+  else let rec loop result p = 
+    if p = 0 
+    then result 
+    else loop (result * n) (p-1) 
+  in loop 1 k
 
 let is_ws = function
   | ' ' | '\012' | '\n' | '\r' | '\t' -> true
