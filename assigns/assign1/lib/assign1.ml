@@ -48,10 +48,47 @@ let implode_all (css : char list list) : string list =
   in loop [] css
 
 let split_on_ws_helper (_cs : char list) : char list list =
-  assert false
+  assert false 
+
+
+let locate_next_ws (s : string) (i : int) : int = 
+  (* input s: the original string 
+     input i: the starting index 
+     output: the index of next white space*) 
+  let rec loop j = 
+    (* base case1: there is no next whitespace *)
+    if String.length s = j 
+    then -1 
+    (* base case2: next whitespace foud *) 
+    else if String.get s j = ' ' || String.get s j = '\n' 
+    then j 
+    (* otherwise: proceed to the next index *)
+    else loop (j + 1) 
+  in loop i 
+
 
 let split_on_ws (s : string) : string list =
-  implode_all (split_on_ws_helper (explode s))
+  let rec loop i words = 
+    (* skip all white spaces and reach next non-white space character *)
+    let rec skip_ws j = 
+      if j >= String.length s 
+      then j 
+      else if String.get s j = ' ' || String.get s j = '\n' 
+      then skip_ws (j + 1) 
+      else j 
+    in 
+    (* set this non-white space character as new start *)
+    let i = skip_ws i in 
+    (* base case: if already reach the last index *)
+    if i >= String.length s 
+    then List.rev words 
+    (* otherwise: find the next white space, and add the word into the list *)
+    else let j = locate_next_ws s i in 
+    if j = -1 
+    then let word = String.sub s i (String.length s - i) in List.rev (word :: words) 
+    else let word = String.sub s i (j - i) in loop (j + 1) (word :: words) 
+  in loop 0 [] 
+
 
 let eval (_stack : int list) (_prog : string list) : int list =
   assert false
