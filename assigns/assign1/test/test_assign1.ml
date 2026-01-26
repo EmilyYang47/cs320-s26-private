@@ -29,7 +29,7 @@ let split_on_ws_tests () =
     assert (["-23"; "45"; "+"] = f "-23 45 +");
   ]
 
-(* let eval_tests () =
+let eval_tests () =
   [
     assert ([1] = eval [] ["1"]);
     assert ([-23; 1] = eval [] ["1"; "-23"]);
@@ -37,7 +37,7 @@ let split_on_ws_tests () =
     assert (eval [1; 2; 3] ["-1"; "+"] = [0; 2; 3]);
     assert (eval [] ["-1"; "2"; "3"; "-"; "+"; "4"; "*"] = [-8]);
     assert (eval [1; 2; 3] ["-1"; "2"; "3"; "-"; "+"; "4"; "*"] = [-8; 1; 2; 3]);
-  ] *)
+  ]
 
 let _run_tests =
   if not testing then [] else
@@ -45,5 +45,5 @@ let _run_tests =
       run sqrt_tests true;
       run pow_tests true;
       run split_on_ws_tests true;
-      (* run eval_tests true; *)
+      run eval_tests true;
     ]

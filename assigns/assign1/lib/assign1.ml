@@ -84,14 +84,43 @@ let split_on_ws (s : string) : string list =
     then List.rev words 
     (* otherwise: find the next white space, and add the word into the list *)
     else let j = locate_next_ws s i in 
-    if j = -1 
-    then let word = String.sub s i (String.length s - i) in List.rev (word :: words) 
-    else let word = String.sub s i (j - i) in loop (j + 1) (word :: words) 
+      if j = -1 
+      then let word = String.sub s i (String.length s - i) in List.rev (word :: words) 
+      else let word = String.sub s i (j - i) in loop (j + 1) (word :: words) 
   in loop 0 [] 
 
 
-let eval (_stack : int list) (_prog : string list) : int list =
-  assert false
+let eval (stack : int list) (prog : string list) : int list =
+  let rec loop result i = 
+    if i >= (List.length prog)   
+    (* base case: already implemented all progs *) 
+    then result 
+    (* otherwise: implement the progs *) 
+    else match List.nth prog i with 
+    | "*" -> (match result with 
+            | x :: y :: rest -> loop ((y * x) :: rest) (i + 1) 
+            | _ -> assert false) 
+    | "+" -> (match result with 
+            | x :: y :: rest -> loop ((y + x) :: rest) (i + 1) 
+            | _ -> assert false) 
+    | "-" -> (match result with 
+            | x :: y :: rest -> loop ((y - x) :: rest) (i + 1) 
+            | _ -> assert false) 
+    | "/" -> (match result with 
+            | x :: y :: rest -> loop ((y / x) :: rest) (i + 1) 
+            | _ -> assert false) 
+    | "mod" -> (match result with 
+            | x :: y :: rest -> loop ((y mod x) :: rest) (i + 1) 
+            | _ -> assert false) 
+    | "sqrt" -> (match result with 
+            | x :: rest -> loop ((sqrt x) :: rest) (i + 1) 
+            | _ -> assert false) 
+    | "^" -> (match result with 
+            | x :: y :: rest -> loop ((pow y x) :: rest) (i + 1) 
+            | _ -> assert false) 
+    | x -> loop (int_of_string x :: result) (i + 1) 
+  in loop stack 0 
+
 
 let interp (input : string) : int =
   match eval [] (split_on_ws input) with
