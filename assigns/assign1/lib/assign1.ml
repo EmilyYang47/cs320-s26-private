@@ -10,6 +10,8 @@ let pow (n : int) (k : int) : int =
   (* first deal with the edge cases *)
   if n = 1 
   then n 
+  else if k = 0 && n = 0 
+  then 0 
   else if k = 0 
   then 1
   else if n = 0
