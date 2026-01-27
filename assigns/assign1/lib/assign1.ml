@@ -6,7 +6,7 @@ let sqrt (n : int) : int =
     else loop (k + 1) 
   in loop 0 
 
-(* let pow (n : int) (k : int) : int = 
+let pow (n : int) (k : int) : int = 
   (* first deal with the edge cases *)
   if n = 1 
   then n 
@@ -19,14 +19,7 @@ let sqrt (n : int) : int =
     if p = 0 
     then result 
     else loop (result * n) (p-1) 
-  in loop 1 k *)
-let pow (m : int) (n : int) : int =
-  let rec loop acc p =
-    if p = 0 then acc
-    else loop (acc * m) (p - 1)
-  in
-  loop 1 n
-
+  in loop 1 k
 
 let is_ws = function
   | ' ' | '\012' | '\n' | '\r' | '\t' -> true
