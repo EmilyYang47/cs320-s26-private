@@ -27,6 +27,10 @@ let split_on_ws_tests () =
     assert (["a"; "bc"] = f "       a bc     ");
     assert (["a"; "bc"] = f "a\n\n\n\n\nbc");
     assert (["-23"; "45"; "+"] = f "-23 45 +");
+    assert ([] = f "");
+    assert ([] = f "  ");
+    assert ([] = f " \n");
+    assert (["a"; "b"] = f "a   b");
   ]
 
 let eval_tests () =

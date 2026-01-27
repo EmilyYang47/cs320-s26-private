@@ -75,7 +75,7 @@ let split_on_ws (s : string) : string list =
     let rec skip_ws j = 
       if j >= String.length s 
       then j 
-      else if String.get s j = ' ' || String.get s j = '\n' 
+      else if String.get s j = ' ' || String.get s j = '\n' || String.get s j = '\t' || String.get s j = '\r'
       then skip_ws (j + 1) 
       else j 
     in 
