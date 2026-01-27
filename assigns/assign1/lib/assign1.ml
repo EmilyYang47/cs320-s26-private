@@ -14,7 +14,8 @@ let pow (n : int) (k : int) : int =
   then 1
   else if n = 0
   then 0
-  (* now handle the general cases *)
+  (* now handle the general cases *) 
+  else if k < 0 then assert false 
   else let rec loop result p = 
     if p = 0 
     then result 
