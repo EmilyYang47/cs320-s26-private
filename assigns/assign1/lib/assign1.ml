@@ -8,11 +8,10 @@ let sqrt (n : int) : int =
 
 let pow (n : int) (k : int) : int = 
   (* first deal with the edge cases *)
-  if k < 0 
-  then if n = 1 
-      then 1
-      else if n = -1 
-      then if k mod 2 = 0 then 1 else -1
+  if n = 1  
+  then 1
+  else if k < 0 && n = -1 
+  then if k mod 2 = 0 then 1 else -1
   else if k = 0 
   then 1
   else if n = 0
