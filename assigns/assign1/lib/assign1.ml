@@ -62,7 +62,7 @@ let locate_next_ws (s : string) (i : int) : int =
     if String.length s = j 
     then -1 
     (* base case2: next whitespace foud *) 
-    else if String.get s j = ' ' || String.get s j = '\n' 
+    else if String.get s j = ' ' || String.get s j = '\n' || String.get s j = '\t' || String.get s j = '\r'
     then j 
     (* otherwise: proceed to the next index *)
     else loop (j + 1) 
