@@ -28,29 +28,46 @@ let eval_tests () =
     (* associativity edge cases *)
     assert (interp "20 - 5 - 3" = 12);      (* (20 - 5) - 3 *)
     assert (interp "100 / 10 / 2" = 5);     (* (100 / 10) / 2 *)
-(* 
-    (* deep nesting *)
-    assert (interp "((((((1))))))" = 1);
-    assert (interp "((2 + 3) * (4 + 5))" = 45);
-    assert (interp "((1 + (2 + 3)) * (4 + (5 * 6)))" = 170); *)
-(* (* 
-    mixed everything *)
-    assert (interp "3 * (2 + 4 * (1 + 1))" = 30);
-    assert (interp "(8 + 2) * (3 + 7 / (1 + 6))" = 70);
 
-    (* large expression *)
-    assert (
-      interp "1 + 2 + 3 * 4 + 5 * (6 + 7) - 8 / 2"
-      = 1 + 2 + 3 * 4 + 5 * (6 + 7) - 8 / 2
-    );
 
-    (* identity / neutral elements *)
-    assert (interp "x + 0" = interp "x");   (* if variables exist *)
-    assert (interp "5 * 1" = 5);
-    assert (interp "5 - 0" = 5);
+    
+    (* subtraction associativity *)
+    assert (interp "20 - 5 - 3" = 12);     (* expected: (20 - 5) - 3 *)
+    (* if your code returns 18, it's right-associative *)
 
-    (* tricky parentheses *)
-    assert (interp "(((((3 + 2))))) * 1" = 5); *)
+    assert (interp "10 - 3 - 2 - 1" = 4);
+    (* expected: (((10 - 3) - 2) - 1) *)
+
+    (* division associativity *)
+    assert (interp "100 / 10 / 2" = 5);
+    (* expected: (100 / 10) / 2 *)
+
+    assert (interp "64 / 4 / 2 / 2" = 4);
+    (* expected: (((64 / 4) / 2) / 2) *)
+
+
+
+    assert (interp "8 - 3 - 2" = 3);    (* (8 - 3) - 2 *)
+    assert (interp "8 / 4 / 2" = 1);    (* (8 / 4) / 2 *)
+
+    assert (interp "10 - 3 - 2 - 1" = 4);
+    assert (interp "64 / 4 / 2 / 2" = 4);
+
+    (* A3: mixed same-precedence *) 
+    assert (interp "20 - 5 + 3" = 18);   (* (20 - 5) + 3 *)
+    assert (interp "20 + 5 - 3" = 22);   (* (20 + 5) - 3 *)
+
+
+    (* A4: mixed precedence + associativity *)
+    assert (interp "10 - 2 * 3 - 1" = 3);
+    (* (10 - (2 * 3)) - 1 *)
+
+    assert (interp "100 / 10 / 2 * 2" = 10);
+    (* ((100 / 10) / 2) * 2 *)
+
+    (* A5: parentheses force correctness *)
+    assert (interp "(20 - 5) - 3" = 12);
+    assert (interp "20 - (5 - 3)" = 18);   
   ]
 
 let _run_tests =

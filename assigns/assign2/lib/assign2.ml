@@ -35,91 +35,64 @@ let lex s =
         else assert false
   in go [] 0
 
-(* let eval _e = assert false TODO  *)
 
 let rec drop_last l =
   match l with
   | x :: y :: rest -> x :: drop_last (y :: rest)
   | _ -> []
 
-let split_on_minus e =
+let split_on_sum_sub e =
   let rec go d acc e =
     match d, e with
-    | _, [] -> (List.rev acc, [])
+    | _, [] -> (List.rev acc, [], [])
     | d, "(" :: xs -> go (d + 1) ("(" :: acc) xs
     | d, ")" :: xs -> go (d - 1) (")" :: acc) xs
-    | 0, "-" :: xs -> (List.rev acc, xs)
+    | 0, "-" :: xs -> (List.rev acc, ["-"], xs)
+    | 0, "+" :: xs -> (List.rev acc, ["+"], xs)
     | d, x :: xs -> go d (x :: acc) xs
-  in go 0 [] e
+  in go 0 [] e 
 
-let split_on_plus e =
+let split_on_mul_div e =
   let rec go d acc e =
     match d, e with
-    | _, [] -> (List.rev acc, [])
+    | _, [] -> (List.rev acc, [], [])
     | d, "(" :: xs -> go (d + 1) ("(" :: acc) xs
     | d, ")" :: xs -> go (d - 1) (")" :: acc) xs
-    | 0, "+" :: xs -> (List.rev acc, xs)
+    | 0, "*" :: xs -> (List.rev acc, ["*"], xs)
+    | 0, "/" :: xs -> (List.rev acc, ["/"], xs)
     | d, x :: xs -> go d (x :: acc) xs
-  in go 0 [] e
+  in go 0 [] e         
 
-let split_on_mul e =
-  let rec go d acc e =
-    match d, e with
-    | _, [] -> (List.rev acc, [])
-    | d, "(" :: xs -> go (d + 1) ("(" :: acc) xs
-    | d, ")" :: xs -> go (d - 1) (")" :: acc) xs
-    | 0, "*" :: xs -> (List.rev acc, xs)
-    | d, x :: xs -> go d (x :: acc) xs
-  in go 0 [] e
-
-let split_on_div e =
-  let rec go d acc e =
-    match d, e with
-    | _, [] -> (List.rev acc, [])
-    | d, "(" :: xs -> go (d + 1) ("(" :: acc) xs
-    | d, ")" :: xs -> go (d - 1) (")" :: acc) xs
-    | 0, "/" :: xs -> (List.rev acc, xs)
-    | d, x :: xs -> go d (x :: acc) xs
-  in go 0 [] e
 
 let rec eval expr =
-  let rec loop acc exp = 
-    match exp with 
-    | [] -> acc 
-    | _ -> let (first_part, second_part) = split_on_minus exp in
-          loop (acc - eval_summation first_part) second_part   
-    in let (first_part, second_part) = split_on_minus expr in
-          loop (eval_summation first_part) second_part  
-          
-and eval_summation expr =
-  let rec loop acc exp =
+  let rec loop acc prev_sign exp =
     match exp with
     | [] -> acc
     | _ ->
-        let (first_part, second_part) = split_on_plus exp in
-        loop (acc + eval_mul first_part) second_part
-    in let (first_part, second_part) = split_on_plus expr in
-    loop (eval_mul first_part) second_part 
+        let (first_part, sign, second_part) = split_on_sum_sub exp in
+        match prev_sign with
+        | [] -> loop acc sign second_part       
+        | "+" :: _ -> loop (acc + eval_mul_div first_part) sign second_part
+        | "-" :: _ -> loop (acc - eval_mul_div first_part) sign second_part
+        | _ -> assert false
+  in let (first_part, sign, second_part) = split_on_sum_sub expr in
+  loop (eval_mul_div first_part) sign second_part 
 
-and eval_mul expr =
-  let rec loop acc exp =
-    match exp with
-    | [] -> acc
-    | _ ->
-        let (first_part, second_part) = split_on_mul exp in
-        loop (acc * eval_div first_part) second_part
-    in let (first_part, second_part) = split_on_mul expr in
-    loop (eval_div first_part) second_part 
 
-and eval_div expr =
-  let rec loop acc exp =
+and eval_mul_div expr = 
+  let rec loop acc prev_sign exp =
     match exp with
     | [] -> acc
     | _ ->
-        let (first_part, second_part) = split_on_div exp in
-        loop (acc / eval_num_paren first_part) second_part
-    in let (first_part, second_part) = split_on_div expr in
-    loop (eval_num_paren first_part) second_part 
+        let (first_part, sign, second_part) = split_on_mul_div exp in
+        match prev_sign with
+        | [] -> loop acc sign second_part       
+        | "*" :: _ -> loop (acc * eval_num_paren first_part) sign second_part
+        | "/" :: _ -> loop (acc / eval_num_paren first_part) sign second_part
+        | _ -> assert false
+  in let (first_part, sign, second_part) = split_on_mul_div expr in
+  loop (eval_num_paren first_part) sign second_part 
+
 
 and eval_num_paren expr =
   match expr with
@@ -127,7 +100,18 @@ and eval_num_paren expr =
   | "(" :: rest -> eval (drop_last rest) (* parened expr *)
   | _ -> assert false                    (* undefined *)
 
+
 let interp (input : string) : int =
   match eval (lex input) with
   | output -> output
-  | exception _ -> failwith "whoops!"
+  | exception _ -> failwith "whoops!" 
+
+
+
+
+
+
+
+
+
+
