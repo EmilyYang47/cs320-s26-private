@@ -154,7 +154,7 @@ for this course under the section *320Caml Specification*.
    derivable.  Also provide the derivation.
 
    \[
-   \texttt{let x = let y = 3 + 3 in x} \Downarrow v
+   \texttt{let x = let y = 3 + 3 in y in x} \Downarrow v
    \]
 
 ** Recursive Let-Expressions
