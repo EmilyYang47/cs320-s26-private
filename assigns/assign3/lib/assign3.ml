@@ -146,14 +146,16 @@ and eval_num_paren env expr =
 
 
 let insert_uniq (k : 'k) (v : 'v) (r : ('k * 'v) list) : ('k * 'v) list =
-  let rec loop variable_list acc = 
+  let rec loop variable_list acc found = 
     match variable_list with 
-    | [] -> acc 
+    | [] -> if found 
+            then acc 
+            else (k, v) :: acc 
     | (l_key, l_value) :: l -> 
       if l_key = k
-      then loop l ( (k, v) :: acc )
-      else loop l ( (l_key, l_value) :: acc )
-  in  loop r [] 
+      then loop l ( (k, v) :: acc ) true 
+      else loop l ( (l_key, l_value) :: acc ) found 
+  in  loop r [] false
 
 let interp (input : string) (env : (string * int) list) : int * (string * int) list =
   match lex input with
