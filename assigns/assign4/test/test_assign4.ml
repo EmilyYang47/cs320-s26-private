@@ -125,7 +125,7 @@ let ty_deriv_of_string_opt_tests =
          "((+ 1 2) ADDINT int ??? ???)")
   ]
 
-(* let check_rule_tests =
+let check_rule_tests =
   let eq expected (rname, prems, concl) =
     assert_equal expected (check_rule rname prems concl)
   in
@@ -175,7 +175,7 @@ let ty_deriv_of_string_opt_tests =
     (* ADD MORE TESTS *)
   ]
 
-let check_deriv_tests =
+(* let check_deriv_tests =
   let eq expected input =
     assert_equal
       expected
@@ -205,9 +205,9 @@ let check_deriv_tests =
          Invalid
          "((+ 1 2) int ADDINT ??? (2 int INTLIT) ???)");
     (* ADD MORE TESTS *)
-  ]
+  ] *)
 
-let value_of_expr_tests =
+(* let value_of_expr_tests =
   let eq expected input =
     assert_equal expected (value_of_expr input)
   in
@@ -237,8 +237,8 @@ let suite =
     expr_of_string_opt_tests;
     string_of_expr_tests;
     ty_deriv_of_string_opt_tests;
-    (* check_rule_tests;
-    check_deriv_tests;
+    check_rule_tests;
+    (* check_deriv_tests;
     value_of_expr_tests; *)
   ]
 
