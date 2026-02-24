@@ -85,17 +85,46 @@ type expr =
   | Bop of op * expr * expr
   | If of expr * expr * expr
 
-let expr_of_sexpr_opt (_ : sexpr) : expr option =
-  assert false (* TODO *)
+let expr_of_sexpr_opt (e : sexpr) : expr option =
+  let rec loop e = 
+    match e with 
+    | Atom n -> Some (Int (int_of_string n))
+    | List [op; e1; e2] ->  (let sexpr_op = op_of_sexpr_opt (op) in 
+                              let sexpr_e1 = loop (e1) in 
+                              let sexpr_e2 = loop (e2) in 
+                              match (sexpr_op, sexpr_e1, sexpr_e2) with 
+                              |  (Some sop, Some se1, Some se2) -> Some (Bop (sop, se1, se2)) 
+                              | _ -> None 
+                            )
+    | List [Atom "if"; cond; e1; e2] -> (let sexpr_cond = loop (cond) in 
+                                        let sexpr_e1 = loop (e1) in 
+                                        let sexpr_e2 = loop (e2) in 
+                                        match (sexpr_cond, sexpr_e1, sexpr_e2) with 
+                                        |  (Some c, Some se1, Some se2) -> Some (If (c, se1, se2)) 
+                                        | _ -> None 
+                                        )
+    | _ -> None 
 
-let expr_of_string_opt (_ : string) : expr option =
-  assert false (* TODO *)
+  in loop e
 
-let sexpr_of_expr (_ : expr) : sexpr =
-  assert false (* TODO *)
 
-let string_of_expr (_ : expr) : string =
-  assert false (* TODO *)
+let expr_of_string_opt (e : string) : expr option =
+  match sexpr_of_string_opt e with 
+  | Some sexpr -> expr_of_sexpr_opt sexpr 
+  | None -> None 
+
+let sexpr_of_expr (e : expr) : sexpr =
+  let rec loop e = 
+    match e with 
+    | Int n -> Atom (string_of_int n)
+    | Bop (op, e1, e2) ->  List [Atom (string_of_op op); loop e1; loop e2] 
+    | If (cond, e1, e2) ->  List [Atom "if"; loop cond; loop e1; loop e2]  
+
+  in loop e
+
+
+let string_of_expr (e : expr) : string =
+  string_of_sexpr (sexpr_of_expr e)
 
 type ty = BoolT | IntT
 
@@ -159,11 +188,36 @@ type ty_deriv =
     }
   | Hole
 
-let ty_deriv_of_sexpr_opt (_ : sexpr) : ty_deriv option =
-  assert false (* TODO *)
+let ty_deriv_of_sexpr_opt (e : sexpr) : ty_deriv option = 
+  let rec handle_premises p = 
+    match p with 
+    | [] -> Some []
+    | x :: xs -> match (loop x, handle_premises xs) with 
+                | Some current, Some rest -> Some (current :: rest) 
+                | _ -> None 
+  and loop e = 
+    match e with 
+    | Atom "???" -> Some (Hole) 
+    | List (expr :: ty :: rname :: derivs) ->  
+                            (let sexpr_expr = expr_of_sexpr_opt expr in 
+                              let sexpr_ty = ty_of_sexpr_opt  ty in 
+                              let sexpr_rname = ty_rule_of_sexpr_opt rname in 
+                              match (sexpr_expr, sexpr_ty, sexpr_rname) with 
+                              |  (Some sexpr, Some sty, Some srname) -> (let previous = (handle_premises derivs) 
+                                                                        in match previous with 
+                                                                          | Some ps -> let concl = {expr = sexpr; ty = sty} in Some (Rule_app {prem_derivs = ps; concl = concl; rname = srname}) 
+                                                                          | _ -> None
+                                                                        )
+                              | _ -> None 
+                            ) 
+    | _ -> None 
 
-let ty_deriv_of_string_opt (_ : string) : ty_deriv option =
-  assert false (* TODO *)
+  in loop e 
+
+let ty_deriv_of_string_opt (e : string) : ty_deriv option =
+  match sexpr_of_string_opt e with
+  | Some sexpr -> ty_deriv_of_sexpr_opt sexpr
+  | None -> None
 
 let string_of_ty_deriv (d : ty_deriv) : string =
   let rec go d =
