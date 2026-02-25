@@ -238,8 +238,8 @@ let suite =
     string_of_expr_tests;
     ty_deriv_of_string_opt_tests;
     check_rule_tests;
-    (* check_deriv_tests;
-    value_of_expr_tests; *)
+    (* check_deriv_tests; *)
+    (* value_of_expr_tests; *)
   ]
 
 let _ = run_test_tt_main suite

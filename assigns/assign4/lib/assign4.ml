@@ -300,31 +300,64 @@ let check_rule (rname : ty_rule) (premises : ty_jmt option list) (concl : ty_jmt
                                         | _ -> false)
                 | _ -> false)
   | Mul_int -> (match premises with
-                | [Some e1; Some e2] -> (match concl with
-                                        | {expr = Bop (Mul, c1, c2); ty = ty} -> e1.expr = c1 && 
-                                                                                e2.expr = c2 && 
-                                                                                e1.ty = IntT && 
-                                                                                e2.ty = IntT && 
-                                                                                ty = IntT 
+                | [e1; e2] -> (match concl with
+                                        | {expr = Bop (Mul, c1, c2); ty = ty} -> (match e1 with
+                                                                                | None -> true
+                                                                                | Some e ->
+                                                                                    e.expr = c1 &&
+                                                                                    e.ty = IntT
+                                                                                )
+                                                                                && 
+                                                                                (match e2 with
+                                                                                | None -> true
+                                                                                | Some e ->
+                                                                                    e.expr = c2 &&
+                                                                                    e.ty = IntT
+                                                                                )
+                                                                                &&
+                                                                                ty = IntT
                                         | _ -> false)
                 | _ -> false)
   | Eq_rule -> (match premises with
-                | [Some e1; Some e2] -> (match concl with
-                                        | {expr = Bop (Eq, c1, c2); ty = ty} -> e1.expr = c1 && 
-                                                                                e2.expr = c2 && 
-                                                                                e1.ty = e2.ty && 
-                                                                                ty = BoolT 
+                | [e1; e2] -> (match concl with
+                                        | {expr = Bop (Eq, c1, c2); ty = ty} -> (match (e1, e2) with
+                                                                                | (Some pe1, Some pe2) ->
+                                                                                    pe1.expr = c1 &&
+                                                                                    pe2.expr = c2 &&
+                                                                                    pe1.ty = pe2.ty && 
+                                                                                    ty = BoolT
+                                                                                | (Some pe1, None) ->
+                                                                                    pe1.expr = c1 && 
+                                                                                    ty = BoolT
+                                                                                | (None, Some pe2) ->
+                                                                                    pe2.expr = c2 && 
+                                                                                    ty = BoolT
+                                                                                | _ -> true
+                                                                                )
                                         | _ -> false)
                 | _ -> false)
   | If_rule -> (match premises with
-                | [Some e1; Some e2; Some e3] -> (match concl with
-                                        | {expr = If (c1, c2, c3); ty = ty} -> e1.expr = c1 && 
-                                                                                e2.expr = c2 && 
-                                                                                e3.expr = c3 && 
-                                                                                e2.ty = e3.ty && 
-                                                                                ty = e2.ty && 
-                                                                                ty = e3.ty && 
-                                                                                e1.ty = BoolT 
+                | [e1; e2; e3] -> (match concl with
+                                        | {expr = If (c1, c2, c3); ty = ty} -> (match e1 with
+                                                                                | Some e -> e.expr = c1 && e.ty = BoolT 
+                                                                                | _ -> true
+                                                                                ) 
+                                                                                && 
+                                                                                (match (e2, e3) with
+                                                                                | (Some pe2, Some pe3) -> 
+                                                                                    pe2.expr = c2 && 
+                                                                                    pe3.expr = c3 && 
+                                                                                    pe2.ty = pe3.ty && 
+                                                                                    ty = pe2.ty && 
+                                                                                    ty = pe3.ty  
+                                                                                | (Some pe2, None) -> 
+                                                                                    pe2.expr = c2 && 
+                                                                                    ty = pe2.ty  
+                                                                                | (None, Some pe3) -> 
+                                                                                    pe3.expr = c3 && 
+                                                                                    ty = pe3.ty  
+                                                                                | _ -> true
+                                                                                )  
                                         | _ -> false)
                 | _ -> false)
 
