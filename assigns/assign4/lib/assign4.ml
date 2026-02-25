@@ -366,8 +366,28 @@ type status =
   | Invalid
   | Partial
 
-let check_deriv (_ : ty_deriv) : status =
-  assert false (* TODO *)
+let check_deriv (deriv : ty_deriv) : status =
+  let rec check_premises ps = 
+    match ps with 
+    | [] -> (Complete, []) 
+    | x :: xs -> let (rest_status, rest) = check_premises xs in 
+                 let current_status = loop x in 
+                 let overall_status = if (current_status = Invalid || rest_status = Invalid) then Invalid else if (current_status = Partial || rest_status = Partial) then Partial else Complete in 
+                 let current = match x with 
+                                | Hole -> None 
+                                (* I originally did "Rule_app {prem_derivs; concl; rname} -> Some concl", 
+                                and an error occured so I changed it to "Rule_app {_; concl; _} -> Some concl";  
+                                but error still persisted so I used TerriorGPT to help me fix it*) 
+                                | Rule_app {prem_derivs = _; concl = concl; rname = _} -> Some concl 
+                 in (overall_status, current :: rest) 
+  and loop deriv = 
+    match deriv with 
+    | Hole -> Partial 
+    | Rule_app {prem_derivs; concl; rname} -> let (premises_status, premises) = check_premises prem_derivs in
+                                              if (premises_status = Invalid || not (check_rule rname premises concl)) then Invalid 
+                                              else if premises_status = Partial then Partial
+                                              else Complete 
+  in loop deriv 
 
 type value = BoolV of bool | IntV of int
 
