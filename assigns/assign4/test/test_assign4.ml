@@ -207,7 +207,7 @@ let check_deriv_tests =
     (* ADD MORE TESTS *)
   ]
 
-(* let value_of_expr_tests =
+let value_of_expr_tests =
   let eq expected input =
     assert_equal expected (value_of_expr input)
   in
@@ -228,7 +228,7 @@ let check_deriv_tests =
             , Bop (Eq, Int 1, Int 1)
             )));
     (* ADD MORE TESTS *)
-  ] *)
+  ]
 
 let suite =
   "assignment 4 test suite" >:::
@@ -239,7 +239,7 @@ let suite =
     ty_deriv_of_string_opt_tests;
     check_rule_tests;
     check_deriv_tests;
-    (* value_of_expr_tests; *)
+    value_of_expr_tests;
   ]
 
 let _ = run_test_tt_main suite

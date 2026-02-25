@@ -396,8 +396,28 @@ let string_of_value (v : value) : string =
   | BoolV b -> string_of_bool b
   | IntV n -> string_of_int n
 
-let value_of_expr (_ : expr) : value =
-  assert false (* TODO *)
+let value_of_expr (e : expr) : value =
+  let rec loop e = 
+    match e with
+    | Int n -> IntV n
+
+    (* I originally did "IntV (IntV (loop e1) + IntV (loop e2))", and TerriorGPT helped me debug this *)
+    | Bop (Add, e1, e2) -> (let v1 = loop e1 in
+                          let v2 = loop e2 in
+                          match v1, v2 with
+                          | IntV a, IntV b -> IntV (a + b)
+                          | _ -> assert false) 
+    | Bop (Mul, e1, e2) -> (let v1 = loop e1 in
+                          let v2 = loop e2 in
+                          match v1, v2 with
+                          | IntV a, IntV b -> IntV (a * b)
+                          | _ -> assert false) 
+    | Bop (Eq, e1, e2) -> BoolV (loop e1 = loop e2)
+    | If (condition, e1, e2) -> match loop condition with 
+                                | BoolV true -> loop e1 
+                                | BoolV false -> loop e2 
+                                | _ -> assert false 
+  in loop e 
 
 type error = Parse_error | Invalid_deriv of ty_deriv
 
