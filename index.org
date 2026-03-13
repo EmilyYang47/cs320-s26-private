@@ -48,7 +48,7 @@ details.
 | 3/10 | *No Lecture*                         |                  | Spring recess                            |
 | 3/12 | *No Lecture*                         |                  | Spring recess                            |
 |------+--------------------------------------+------------------+------------------------------------------|
-| 3/16 | Lab 7: Parser Generators             |                  |                                          |
+| 3/16 | Lab 7: [[file:labs/lab07/lab07.org][Parser Generators]]             |                  |                                          |
 | 3/17 | Operational Semantics                |                  |                                          |
 | 3/19 | Substitution                         |                  | Mini-Project 1 (MP1) out, A5 due, A6 due |
 |------+--------------------------------------+------------------+------------------------------------------|
