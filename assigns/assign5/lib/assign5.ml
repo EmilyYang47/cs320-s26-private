@@ -16,8 +16,76 @@ type stmt = Syntax.stmt =
   | Init of string * int list * float sexpr
   | Set of string * string list * expr
 
-let dim_check (env : (string * tensor) list) (e : expr) : ((string * int) list) option =
-  ignore (env, e); assert false (* TODO *)
+let rec get_t env name = 
+  match env with 
+    | [] -> None 
+    | (n, t) :: rest_env -> if n = name then Some t else get_t rest_env name
+
+let rec dim_check (env : (string * tensor) list) (e : expr) : ((string * int) list) option =
+  (* TODO *)
+  match e with 
+  | Ident (name, labels) -> (match get_t env name with 
+                            | None -> None 
+                            | Some t -> if List.length (Tensor.shape t) <> List.length labels then None 
+                                        else if let rec contains l rest_labels = 
+                                                  (match rest_labels with 
+                                                  | [] -> false 
+                                                  | x :: xs -> if l = x then true else contains l xs 
+                                                  )
+                                                in 
+                                                let rec check_not_distinct label_lst =
+                                                  (match label_lst with
+                                                  | [] -> false
+                                                  | x :: xs -> if contains x xs then true else check_not_distinct xs
+                                                  )
+                                                in 
+                                                check_not_distinct labels then None 
+                                        else let rec generate_lst label_lst size_lst = 
+                                                (match (label_lst, size_lst) with 
+                                                | ([], []) -> [] 
+                                                | (x :: xs, y :: ys) -> (x, y) :: generate_lst xs ys 
+                                                | (_, _) -> [] 
+                                                )
+                                              in 
+                                              Some (generate_lst labels (Tensor.shape t))
+                              )
+  | Map (_, e1, e2) -> (match (dim_check env e1, dim_check env e2) with 
+                        | (Some a, Some b) -> let sorted = List.sort (fun (x,_) (y,_) -> String.compare x y) (a @ b)
+                                              in 
+                                              let rec loop lst acc =
+                                                  (match lst with
+                                                  | [] -> Some (List.rev acc)  
+                                                  | (l, s) :: rest -> ( match acc with
+                                                                        | [] -> loop rest [(l, s)] 
+                                                                        | (prev_l, prev_s) :: _ -> if l = prev_l then
+                                                                                                      if s = prev_s then loop rest acc 
+                                                                                                      else None
+                                                                                                    else loop rest ((l, s) :: acc) 
+                                                                      )
+                                                  )
+                                              in
+                                              loop sorted [] 
+                        | (_, _) -> None 
+                        )
+  | Fold (_, i, e) -> match dim_check env e with 
+                        | None -> None 
+                        | Some a -> let rec find_size label lst =
+                                      (match lst with
+                                      | [] -> None
+                                      | (l, s) :: rest -> if l = label then Some s else find_size label rest 
+                                      )
+                                    in 
+                                    (match find_size i a with 
+                                    | None -> None 
+                                    | Some _ -> let rec remove_axis label lst =
+                                                  match lst with
+                                                  | [] -> []
+                                                  | (l, s) :: rest -> if l = label then remove_axis label rest else (l, s) :: remove_axis label rest 
+                                                in Some (remove_axis i a)
+                                    )
+                                             
+
+
 
 let eval (env : (string * tensor) list) (e : expr) : tensor =
   ignore (env, e); assert false (* TODO *)
