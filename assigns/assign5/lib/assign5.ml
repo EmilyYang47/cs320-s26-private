@@ -76,7 +76,7 @@ let rec dim_check (env : (string * tensor) list) (e : expr) : ((string * int) li
   | Fold (_, i, e) -> match dim_check env e with 
                         | None -> None 
                         | Some a -> (match find_size i a with 
-                                    | None -> None 
+                                    | None -> Some a 
                                     | Some _ -> Some (remove_axis i a)
                                     ) 
 
