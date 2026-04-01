@@ -6,8 +6,14 @@ type 'a tree =
   | Node2 of 'a * 'a tree * 'a tree
   | Node3 of 'a * 'a tree * 'a tree * 'a tree
 
-let reverse (_t : 'a tree) : 'a tree =
-  assert false
+let rec reverse (t : 'a tree) : 'a tree =
+  match t with
+  | Leaf v -> Leaf v
+  | Node2 (v, left, right) ->
+      Node2 (v, reverse right, reverse left)
+  | Node3 (v, left, middle, right) ->
+      Node3 (v, reverse right, reverse middle, reverse left)
+
 
 (* Problem 2 *)
 
@@ -22,8 +28,23 @@ let split_at (k : int) (s : string) : string * string =
   then s, ""
   else String.sub s 0 k, String.sub s k (String.length s - k)
 
-let get_int (_s : string) : (int * string) option =
-  assert false
+let get_int (s : string) : (int * string) option =
+  if String.length s = 0 then None
+  else
+    let start =
+      if s.[0] = '-' then 1 else 0
+    in
+    if not (is_digit s.[start]) then None 
+    else 
+      let rec find_end i =
+        if i < String.length s && is_digit s.[i] then
+          find_end (i + 1)
+        else
+          i
+      in 
+      let (n, rest) = split_at (find_end start) s
+      in Some (int_of_string n, rest) 
+    
 
 (* Problem 3 *)
 

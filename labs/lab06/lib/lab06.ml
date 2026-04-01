@@ -1,22 +1,32 @@
 
-let map (f : 'a -> 'b) (l : 'a list) : 'a list =
-  ignore (f, l); assert false
+let rec map (f : 'a -> 'b) (l : 'a list) : 'a list =
+  match l with 
+  | [] -> []
+  | x :: xs -> f x :: map f xs
 
-let filter (f : 'a -> bool) (l : 'a list) : 'a list =
-  ignore (f, l); assert false
+let rec filter (f : 'a -> bool) (l : 'a list) : 'a list =
+  math l with 
+  | [] -> [] 
+  (* | x :: xs when f x -> x :: filter f xs 
+  | _ :: xs -> filter f xs  *)
+  | x :: xs -> if f x then x :: filter f xs 
+  else filter f xs 
 
 let fold_left
     (f : 'acc -> 'a -> 'acc)
     (base : 'acc)
     (l : 'a list) : 'acc =
-  ignore (f, base, l); assert false
+  match l with 
+  | [] -> base 
+  | x :: xs -> fold_lect f (f base x) xs 
 
 let fold_right
     (f : 'a -> 'acc -> 'acc)
     (l : 'a list)
     (base : 'acc) : 'acc =
-  ignore (f, l, base); assert false
+  match l with 
 
+  
 module Matrix = struct
   type 'a t = 'a list list
 

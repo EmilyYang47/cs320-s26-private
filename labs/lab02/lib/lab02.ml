@@ -47,7 +47,15 @@ let split_on_minus e =
     | d, x :: xs -> go d (x :: acc) xs
   in go 0 [] e
 
-let rec eval _e = assert false (* TODO *) (* ALSO CHANGE _e TO e *)
+let rec eval e = 
+  let rec loop acc exp = 
+    match exp with 
+    | [] -> acc 
+    | _ -> let (first_part, second_part) = split_on_minus exp in
+          loop (acc - eval_num_paren first_part) second_part   
+    in let (first_part, second_part) = split_on_minus e in
+          loop (eval_num_paren first_part) second_part   
+
 and eval_num_paren e =
   match e with
   | [n] -> int_of_string n

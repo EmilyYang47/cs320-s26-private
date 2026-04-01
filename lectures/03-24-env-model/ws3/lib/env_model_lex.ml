@@ -53,7 +53,12 @@ let rec eval (env : dyn_env) (e : expr) : value =
        ───────────────────────────────────────────────────────────────────────────────────── (appE)
                                           ℰ ⊢ e₁ e₂ ⇓ v
     *)
-    ignore (e1, e2); assert false (* TODO *)
+    let env1 = env in 
+    begin 
+      match eval env1 e1 with 
+      |VClos (env', Fun (x, e)) -> let v2 = eval env1 
+      | _ -> assert false 
+    end 
   | Let (x, e1, e2) ->
     (*
        ℰ ⊢ e₁ ⇓ v₁      ℰ' = ℰ[x ↦ v₁]      ℰ' ⊢ e₂ ⇓ v
