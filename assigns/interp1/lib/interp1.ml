@@ -56,44 +56,53 @@ type dyn_env = value Env.t
 (* Type Checking *)
 
 let type_of (ctxt : ctxt) (e : expr) : ty option =
-  let rec loop context exp = 
-    | Unit  -> Some (Unit)
-    | Bool _ -> Some (Bool)
-    | Int _ -> Some (Int)
+  let rec loop (context : ctxt) (exp : expr) = 
+    match exp with 
+    | Unit  -> Some (Unit : ty)
+    | Bool _ -> Some (Bool : ty)
+    | Int _ -> Some (Int : ty)
     | Var x -> Env.find_opt x context (* For this part, I googled "Ocaml, Map.male (String)" and it taught me about the common operations of map module *)
-    | Let (x, e1, e2) -> match (loop context e1) with 
-                          | Some (t1) -> loop (End.add x t1 context) e2 
-                          | _ -> None   
-                          | LetRec {name, arg, arg_ty, out_ty, binding, body} -> let t1 = Fun (arg_ty, out_ty) in
-                                                                                  let ctxt1 = Env.add name t1 (Env.add arg arg_ty context) in
-                                                                                  (match loop ctxt1 binding with 
-                                                                                  | Some (t2) -> if t2 <> out_ty then None
-                                                                                                  else loop (Env.add name t1 ctxt) body
-                                                                                  | _ -> None ) 
-                          | If (e1, e2, e3) -> if (loop context e1) = Some (Bool) and (loop context e2) = (loop context e3) then Some (loop context e2) else None 
-                          | Fun (var, t1, e) -> let t2 = loop (End.add var t1 context) e in 
-                                                if t2 = None then None else Fun (t1, t2) 
-                          | App (e1, e2) -> match (loop context e1) with 
-                                            | Fun (t2, t) -> if (loop context e2) = t2 then t else None 
-                                            | _ -> None 
-                          | Bop (bop, e1, e2) -> match loop context e1, go xontext e2 with
-                                                  | Some (Int), Some (Int) ->
-                                                      (match op with
-                                                        | Add | Sub | Mul | Div | Mod -> Some (Int)
-                                                        | Lt  | Lte | Gt  | Gte | Eq  | Neq -> Some (Bool) 
-                                                        | _ -> None)
-                                                  | Some (Bool), Some (Bool) ->
-                                                      (match op with
-                                                        | And | Or | Eq  | Neq -> Some (Bool)
-                                                        | _         -> None)
-                                                  | Some (t1), Some (t2) -> if t1 = t2 then (if op = Eq or op = Neq then Some (Bool) else None) else None 
-                                                  | _ -> None 
-                          | Negate (e) -> match loop context e with 
-                                          | Some (Int) -> Some (Int) 
-                                          | _ -> None 
-                          | Assert (e) -> match loop context e with 
-                                          | Some (Bool) -> Some (Unit) 
-                                          | _ -> None 
+    | Let (x, e1, e2) -> (match (loop context e1) with 
+                          | Some (t1) -> loop (Env.add x t1 context) e2 
+                          | _ -> None
+                        )   
+    | LetRec {name; arg; arg_ty; out_ty; binding; body} -> let t1 : ty = Fun (arg_ty, out_ty) in
+                                                            let ctxt1 = Env.add name t1 (Env.add arg arg_ty context) in
+                                                            (match loop ctxt1 binding with 
+                                                            | Some (t2) -> if t2 <> out_ty then None
+                                                                            else loop (Env.add name t1 ctxt) body
+                                                            | _ -> None ) 
+    | If (e1, e2, e3) -> if (loop context e1) = Some (Bool) && (loop context e2) = (loop context e3) then (loop context e2) else None 
+    | Fun (var, t1, e) -> (match loop (Env.add var t1 context) e with 
+                          | None -> None 
+                          | Some (t2) -> Some (Fun (t1, t2)) 
+                          ) 
+    | App (e1, e2) -> (match (loop context e1) with 
+                      | Some (Fun (t2, t)) -> if (loop context e2) = Some (t2) then Some (t) else None 
+                      | _ -> None 
+                      )
+    | Bop (bop, e1, e2) -> (match loop context e1, loop context e2 with
+                            | Some (Int), Some (Int) ->
+                                (match bop with
+                                  | Add | Sub | Mul | Div | Mod -> Some (Int)
+                                  | Lt  | Lte | Gt  | Gte | Eq  | Neq -> Some (Bool) 
+                                  | _ -> None)
+                            | Some (Bool), Some (Bool) ->
+                                (match bop with
+                                  | And | Or | Eq  | Neq -> Some (Bool)
+                                  | _         -> None)
+                            | Some (t1), Some (t2) -> if t1 = t2 then (if ((bop = Eq) || (bop = Neq)) then Some (Bool) else None) else None 
+                            | _ -> None 
+                            )  
+    | Negate (e) -> (match loop context e with 
+                    | Some (Int) -> Some (Int) 
+                    | _ -> None 
+                    ) 
+    | Assert (e) -> (match loop context e with 
+                    | Some (Bool) -> Some (Unit) 
+                    | _ -> None 
+                    )
+  in loop ctxt e
 
 (* Evaluation *)
 
@@ -128,15 +137,3 @@ let interp ~(filename : string) : value option =
            Format.eprintf "%s" msg)
     in None
 
-
-
-
-    | App (e1, e2) ->
-    (*
-       e₁ ⇓ λ x . e      e₂ ⇓ v₂      e' = [v₂ / x]e      e' ⇓ v
-       ─────────────────────────────────────────────────────────── (appE)
-                             ℰ ⊢ e₁ e₂ ⇓ v
-    *)
-    match eval e1 with 
-    | VFun (x, e) -> eval (subst (eval e2) x e) 
-    | _ -> assert false 
