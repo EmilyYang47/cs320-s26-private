@@ -94,7 +94,11 @@ let type_of (ctxt : ctxt) (e : expr) : ty option =
                                 (match bop with
                                   | And | Or | Eq  | Neq -> Some (Bool)
                                   | _ -> None) 
-                            | Some (t1), Some (t2) -> if t1 = t2 then (if ((bop = Eq) || (bop = Neq)) then Some (Bool) else None) else None 
+                            | Some (t1), Some (t2) -> if t1 = t2 then (match bop with
+                                                                        | Eq | Neq -> Some (Bool : ty)
+                                                                        | _        -> None
+                                                                      ) 
+                                                                  else None 
                             | _ -> None 
                             )  
     | Negate (e) -> (match loop context e with 
