@@ -161,8 +161,10 @@ let eval (env : dyn_env) (e : expr) : value =
                                   | _ -> assert false) 
                             | Bool (v1), Bool (v2) ->
                                 (match bop with
-                                  | And -> Bool (v1 && v2) 
-                                  | Or -> Bool (v1 || v2) 
+                                  (* | And -> Bool (v1 && v2) 
+                                  | Or -> Bool (v1 || v2)  *)
+                                  | And -> if v1 = true then v2 else false 
+                                  | Or -> if v1 = true then true else v2  
                                   | Eq  -> Bool (v1 = v2) 
                                   | Neq -> Bool (v1 <> v2) 
                                   | Lt -> Bool (v1 < v2)
