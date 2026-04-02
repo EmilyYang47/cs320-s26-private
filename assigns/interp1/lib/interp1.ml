@@ -93,12 +93,12 @@ let type_of (ctxt : ctxt) (e : expr) : ty option =
                             | _ -> None)
                       | Some (Bool : ty), Some (Bool : ty) ->
                           (match bop with
-                            | And | Or | Eq | Neq -> Some (Bool : ty)
+                            | And | Or | Lt | Lte | Gt | Gte | Eq | Neq -> Some (Bool : ty)
                             | _ -> None)
                       | Some t1, Some t2 ->
                           if t1 = t2 then
                             (match bop with
-                              | Eq | Neq -> Some (Bool : ty)
+                              | Lt | Lte | Gt | Gte | Eq | Neq -> Some (Bool : ty)
                               | _ -> None)
                           else None
                       | _ -> None)  
