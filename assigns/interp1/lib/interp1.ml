@@ -112,13 +112,13 @@ exception Assert_fail
 let eval (env : dyn_env) (e : expr) : value =
   let rec loop (environment : dyn_env) (exp : expr) = 
     match exp with 
-    | Unit  -> Unit : value 
-    | Bool b -> Bool b : value
-    | Int n -> Int n : value
+    | Unit  -> Unit  
+    | Bool b -> Bool b 
+    | Int n -> Int n 
     | Var x -> Env.find x environment (* For this part, I googled "Ocaml, Map.male (String)" and it taught me about the common operations of map module *)
     | Let (x, e1, e2) -> let v1 = loop environment e1 in 
                           loop (Env.add x v1 environment) e2  
-    | LetRec {name; arg; arg_ty; out_ty; binding; body} -> let env2 = Env.add name (Clos (environment, Some name, Fun (arg, arg_ty, binding))) environment in loop env2 body 
+    | LetRec {name; arg; arg_ty; binding; body; _} -> let env2 = (Env.add name (Clos (environment, Some name, Fun (arg, arg_ty, binding))) environment) in loop env2 body (* I used gen-ai to help me debug this line; my original code put the "_" in the middle of the pattern *)
     | If (e1, e2, e3) -> (match loop environment e1 with
                           | Bool true  -> loop environment e2
                           | Bool false -> loop environment e3
@@ -126,10 +126,10 @@ let eval (env : dyn_env) (e : expr) : value =
                           )  
     | Fun (x, t, e) -> Clos (environment, None , Fun (x, t, e))    
     | App (e1, e2) -> let v2 = loop environment e2 in 
-                      match loop environment e1 with 
-                      | Clos (env2, None , Fun (x, t, e)) -> env3 = Env.add x v2 env2 in 
-                                                            loop env3 e 
-                      | _ -> assert false 
+                      (match loop environment e1 with 
+                      | Clos (env2, None , Fun (x, _, e)) -> let env3 = Env.add x v2 env2 in loop env3 e 
+                      | _ -> assert false
+                      )  
     | Bop (bop, e1, e2) -> (match loop environment e1, loop environment e2 with
                             | Int (v1), Int (v2) ->
                                 (match bop with
@@ -157,7 +157,6 @@ let eval (env : dyn_env) (e : expr) : value =
                                   | Eq  -> Bool (v1 = v2) 
                                   | Neq -> Bool (v1 <> v2) 
                                   | _ -> assert false) 
-                            | _ -> assert false  
                             )  
     | Negate (e) -> (match loop environment e with 
                     | Int (v1) -> Int (- v1) 
@@ -168,7 +167,7 @@ let eval (env : dyn_env) (e : expr) : value =
                     | Bool (false) -> raise Assert_fail
                     | _ -> assert false  
                     )
-  in loop ctxt e 
+  in loop env e 
 
 (* Interpretation *)
 
