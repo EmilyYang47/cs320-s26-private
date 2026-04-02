@@ -72,7 +72,10 @@ let type_of (ctxt : ctxt) (e : expr) : ty option =
                                                             | Some (t2) -> if t2 <> out_ty then None
                                                                             else loop (Env.add name t1 ctxt) body
                                                             | _ -> None ) 
-    | If (e1, e2, e3) -> if (loop context e1) = Some (Bool) && (loop context e2) = (loop context e3) then (loop context e2) else None 
+    | If (e1, e2, e3) -> (match loop context e1, loop context e2, loop context e3 with
+                          | Some (Bool : ty), Some t2, Some t3 ->
+                              if t2 = t3 then Some t2 else None
+                          | _ -> None)  
     | Fun (var, t1, e) -> (match loop (Env.add var t1 context) e with 
                           | None -> None 
                           | Some (t2) -> Some (Fun (t1, t2)) 
@@ -125,11 +128,17 @@ let eval (env : dyn_env) (e : expr) : value =
                           | _ -> assert false 
                           )  
     | Fun (x, t, e) -> Clos (environment, None , Fun (x, t, e))    
-    | App (e1, e2) -> let v2 = loop environment e2 in 
-                      (match loop environment e1 with 
-                      | Clos (env2, None , Fun (x, _, e)) -> let env3 = Env.add x v2 env2 in loop env3 e 
-                      | _ -> assert false
-                      )  
+    | App (e1, e2) -> let v1   = loop environment e1 in
+                      let v2 = loop environment e2 in
+                      (match v1 with
+                      | Clos (env2, name, Fun (x, _, e)) ->
+                          let env3 = Env.add x v2 env2 in
+                          let env3 = match name with
+                            | Some n -> Env.add n v1 env3
+                            | None   -> env3
+                          in
+                          loop env3 e
+                      | _ -> assert false) 
     | Bop (bop, e1, e2) -> (match loop environment e1, loop environment e2 with
                             | Int (v1), Int (v2) ->
                                 (match bop with
