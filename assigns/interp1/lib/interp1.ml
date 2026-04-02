@@ -167,8 +167,6 @@ let eval (env : dyn_env) (e : expr) : value =
                                   | Lte -> Bool (v1 <= v2)
                                   | Gt  -> Bool (v1 > v2)
                                   | Gte -> Bool (v1 >= v2)
-                                  | And -> Bool (v1 && v2)
-                                  | Or  -> Bool (v1 || v2)
                                   | _ -> assert false
                                 )
                             | Bool (v1), v2 ->
