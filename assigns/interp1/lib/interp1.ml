@@ -73,8 +73,8 @@ let type_of (ctxt : ctxt) (e : expr) : ty option =
                                                                             else loop (Env.add name t1 ctxt) body
                                                             | _ -> None ) 
     | If (e1, e2, e3) -> (match loop context e1, loop context e2, loop context e3 with
-                          | Some (Bool : ty), Some t2, Some t3 ->
-                              if t2 = t3 then Some t2 else None
+                          | Some (Bool : ty), Some (t2), Some (t3) ->
+                              if t2 = t3 then Some (t2) else None
                           | _ -> None)  
     | Fun (var, t1, e) -> (match loop (Env.add var t1 context) e with 
                           | None -> None 
@@ -145,8 +145,8 @@ let eval (env : dyn_env) (e : expr) : value =
                                   | Add -> Int (v1 + v2)
                                   | Sub -> Int (v1 - v2)
                                   | Mul -> Int (v1 * v2)
-                                  | Div -> Int (v1 / v2)
-                                  | Mod -> Int (v1 mod v2)
+                                  | Div -> if v2 = 0 then raise Div_by_zero else Int (v1 / v2) 
+                                  | Mod -> if v2 = 0 then raise Div_by_zero else Int (v1 mod v2) 
                                   | Lt  -> Bool (v1 < v2)
                                   | Lte -> Bool (v1 <= v2)
                                   | Gt  -> Bool (v1 > v2)
