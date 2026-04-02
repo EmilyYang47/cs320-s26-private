@@ -84,23 +84,24 @@ let type_of (ctxt : ctxt) (e : expr) : ty option =
                       | Some (Fun (t2, t)) -> if (loop context e2) = Some (t2) then Some (t) else None 
                       | _ -> None 
                       )
-    | Bop (bop, e1, e2) -> (match loop context e1, loop context e2 with
-                            | Some (Int), Some (Int) -> 
-                                (match bop with
-                                  | Add | Sub | Mul | Div | Mod -> Some (Int)
-                                  | Lt  | Lte | Gt  | Gte | Eq  | Neq -> Some (Bool) 
-                                  | _ -> None) 
-                            | Some (Bool), Some (Bool) -> 
-                                (match bop with
-                                  | And | Or | Eq  | Neq -> Some (Bool)
-                                  | _ -> None) 
-                            | Some (t1), Some (t2) -> if t1 = t2 then (match bop with
-                                                                        | Eq | Neq -> Some (Bool : ty)
-                                                                        | _        -> None
-                                                                      ) 
-                                                                  else None 
-                            | _ -> None 
-                            )  
+    | Bop (bop, e1, e2) ->
+                      (match loop context e1, loop context e2 with
+                      | Some (Int : ty), Some (Int : ty) ->
+                          (match bop with
+                            | Add | Sub | Mul | Div | Mod -> Some (Int  : ty)
+                            | Lt  | Lte | Gt  | Gte | Eq  | Neq -> Some (Bool : ty)
+                            | _ -> None)
+                      | Some (Bool : ty), Some (Bool : ty) ->
+                          (match bop with
+                            | And | Or | Eq | Neq -> Some (Bool : ty)
+                            | _ -> None)
+                      | Some t1, Some t2 ->
+                          if t1 = t2 then
+                            (match bop with
+                              | Eq | Neq -> Some (Bool : ty)
+                              | _ -> None)
+                          else None
+                      | _ -> None)  
     | Negate (e) -> (match loop context e with 
                     | Some (Int) -> Some (Int) 
                     | _ -> None 
