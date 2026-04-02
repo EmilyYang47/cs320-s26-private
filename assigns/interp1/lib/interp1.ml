@@ -159,23 +159,24 @@ let eval (env : dyn_env) (e : expr) : value =
                                   | Eq  -> Bool (v1 = v2)
                                   | Neq -> Bool (v1 <> v2) 
                                   | _ -> assert false) 
+                            | Bool (v1), Bool (v2) ->
+                                (match bop with
+                                  | Eq  -> Bool (v1 = v2)
+                                  | Neq -> Bool (v1 <> v2)
+                                  | Lt  -> Bool (v1 < v2)
+                                  | Lte -> Bool (v1 <= v2)
+                                  | Gt  -> Bool (v1 > v2)
+                                  | Gte -> Bool (v1 >= v2)
+                                  | And -> Bool (v1 && v2)
+                                  | Or  -> Bool (v1 || v2)
+                                  | _ -> assert false
+                                )
                             | Bool (v1), v2 ->
                                 (match bop with
-                                  (* | And -> Bool (v1 && v2) 
-                                  | Or -> Bool (v1 || v2)  *)
-                                  | And -> if v1 = true then v2 else Bool(false) 
-                                  | Or -> if v1 = true then Bool(true) else v2  
-                                )
-                            | Bool (v1), Bool(v2) ->
-                                (match bop with
-                                  | Eq  -> Bool (v1 = v2) 
-                                  | Neq -> Bool (v1 <> v2) 
-                                  | Lt -> Bool (v1 < v2)
-                                  | Lte -> Bool (v1 <= v2)
-                                  | Gt -> Bool (v1 > v2)
-                                  | Gte -> Bool (v1 >= v2)
+                                  | And -> if v1 then v2 else Bool false
+                                  | Or  -> if v1 then Bool true else v2
                                   | _ -> assert false
-                                ) 
+                                )
                             | v1, v2 -> 
                                   (match bop with 
                                   | Eq  -> Bool (v1 = v2) 
