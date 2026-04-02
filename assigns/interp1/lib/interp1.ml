@@ -82,15 +82,15 @@ let type_of (ctxt : ctxt) (e : expr) : ty option =
                       | _ -> None 
                       )
     | Bop (bop, e1, e2) -> (match loop context e1, loop context e2 with
-                            | Some (Int), Some (Int) ->
+                            | Some (Int), Some (Int) -> 
                                 (match bop with
                                   | Add | Sub | Mul | Div | Mod -> Some (Int)
                                   | Lt  | Lte | Gt  | Gte | Eq  | Neq -> Some (Bool) 
-                                  | _ -> None)
-                            | Some (Bool), Some (Bool) ->
+                                  | _ -> None) 
+                            | Some (Bool), Some (Bool) -> 
                                 (match bop with
                                   | And | Or | Eq  | Neq -> Some (Bool)
-                                  | _         -> None)
+                                  | _ -> None) 
                             | Some (t1), Some (t2) -> if t1 = t2 then (if ((bop = Eq) || (bop = Neq)) then Some (Bool) else None) else None 
                             | _ -> None 
                             )  
@@ -110,7 +110,65 @@ exception Div_by_zero
 exception Assert_fail
 
 let eval (env : dyn_env) (e : expr) : value =
-  ignore (env, e); assert false (* TODO *)
+  let rec loop (environment : dyn_env) (exp : expr) = 
+    match exp with 
+    | Unit  -> Unit : value 
+    | Bool b -> Bool b : value
+    | Int n -> Int n : value
+    | Var x -> Env.find x environment (* For this part, I googled "Ocaml, Map.male (String)" and it taught me about the common operations of map module *)
+    | Let (x, e1, e2) -> let v1 = loop environment e1 in 
+                          loop (Env.add x v1 environment) e2  
+    | LetRec {name; arg; arg_ty; out_ty; binding; body} -> let env2 = Env.add name (Clos (environment, Some name, Fun (arg, arg_ty, binding))) environment in loop env2 body 
+    | If (e1, e2, e3) -> (match loop environment e1 with
+                          | Bool true  -> loop environment e2
+                          | Bool false -> loop environment e3
+                          | _ -> assert false 
+                          )  
+    | Fun (x, t, e) -> Clos (environment, None , Fun (x, t, e))    
+    | App (e1, e2) -> let v2 = loop environment e2 in 
+                      match loop environment e1 with 
+                      | Clos (env2, None , Fun (x, t, e)) -> env3 = Env.add x v2 env2 in 
+                                                            loop env3 e 
+                      | _ -> assert false 
+    | Bop (bop, e1, e2) -> (match loop environment e1, loop environment e2 with
+                            | Int (v1), Int (v2) ->
+                                (match bop with
+                                  | Add -> Int (v1 + v2)
+                                  | Sub -> Int (v1 - v2)
+                                  | Mul -> Int (v1 * v2)
+                                  | Div -> Int (v1 / v2)
+                                  | Mod -> Int (v1 mod v2)
+                                  | Lt  -> Bool (v1 < v2)
+                                  | Lte -> Bool (v1 <= v2)
+                                  | Gt  -> Bool (v1 > v2)
+                                  | Gte -> Bool (v1 >= v2)
+                                  | Eq  -> Bool (v1 = v2)
+                                  | Neq -> Bool (v1 <> v2) 
+                                  | _ -> assert false) 
+                            | Bool (v1), Bool (v2) ->
+                                (match bop with
+                                  | And -> Bool (v1 && v2) 
+                                  | Or -> Bool (v1 || v2) 
+                                  | Eq  -> Bool (v1 = v2) 
+                                  | Neq -> Bool (v1 <> v2) 
+                                  | _ -> assert false) 
+                            | v1, v2 -> 
+                                  (match bop with 
+                                  | Eq  -> Bool (v1 = v2) 
+                                  | Neq -> Bool (v1 <> v2) 
+                                  | _ -> assert false) 
+                            | _ -> assert false  
+                            )  
+    | Negate (e) -> (match loop environment e with 
+                    | Int (v1) -> Int (- v1) 
+                    | _ -> assert false  
+                    ) 
+    | Assert (e) -> (match loop environment e with 
+                    | Bool (true)  -> Unit
+                    | Bool (false) -> raise Assert_fail
+                    | _ -> assert false  
+                    )
+  in loop ctxt e 
 
 (* Interpretation *)
 

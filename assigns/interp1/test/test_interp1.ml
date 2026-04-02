@@ -44,21 +44,3 @@ let suite =
 
 let _run = run_test_tt_main suite
 
-
-(* 
-
-
-
-
-
-
-
-| App (e1, e2) ->
-    (*
-       e₁ ⇓ λ x . e      e₂ ⇓ v₂      e' = [v₂ / x]e      e' ⇓ v
-       ─────────────────────────────────────────────────────────── (appE)
-                             ℰ ⊢ e₁ e₂ ⇓ v
-    *)
-    match eval e1 with 
-    | VFun (x, e) -> eval (subst (eval e2) x e) 
-    | _ -> assert false  *)
