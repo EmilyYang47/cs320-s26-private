@@ -70,7 +70,7 @@ let type_of (ctxt : ctxt) (e : expr) : ty option =
                                                             let ctxt1 = Env.add name t1 (Env.add arg arg_ty context) in
                                                             (match loop ctxt1 binding with 
                                                             | Some (t2) -> if t2 <> out_ty then None
-                                                                            else loop (Env.add name t1 ctxt) body
+                                                                            else loop (Env.add name t1 context) body
                                                             | _ -> None ) 
     | If (e1, e2, e3) -> (match loop context e1, loop context e2, loop context e3 with
                           | Some (Bool : ty), Some (t2), Some (t3) ->
