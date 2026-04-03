@@ -133,7 +133,7 @@ let eval (env : dyn_env) (e : expr) : value =
                           | _ -> assert false 
                           )  
     | Fun (x, t, e) -> Clos (environment, None , Fun (x, t, e))    
-    | App (e1, e2) -> let v1   = loop environment e1 in
+    | App (e1, e2) -> let v1 = loop environment e1 in
                       let v2 = loop environment e2 in
                       (match v1 with
                       | Clos (env2, name, Fun (x, _, e)) ->
