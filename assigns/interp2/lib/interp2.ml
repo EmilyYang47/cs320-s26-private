@@ -168,7 +168,108 @@ type ctxt = ty Env.t
 (* Type Checking *)
 
 let type_of_expr (ctxt : ctxt) (e : expr) : (ty, Error_msg.t) result =
-  ignore (ctxt, e); assert false
+  let rec loop (context : ctxt) (exp : expr) = 
+    match exp.expr with 
+    | Unit  -> Ok (TUnit : ty)
+    | Bool _ -> Ok (TBool : ty)
+    | Int _ -> Ok (TInt : ty)
+    | Nil   -> Ok (TInt_list : ty) 
+    | Var x -> (match Env.find_opt x context with
+                | Some t -> Ok t
+                | None   -> assert false
+              )
+    | Let {is_rec; name; args; annot; binding; body} -> if not is_rec && (args = []) 
+                                                        (* LET *)
+                                                        then (match (loop context binding) with 
+                                                          | Ok (t1) -> loop (Env.add name t1 context) body 
+                                                          | _ -> assert false 
+                                                        ) 
+                                                        else (match annot with 
+                                                              (* LETFUNANNOT & LETREC *) 
+                                                              | Some out_ty -> let arg_ctxt = List.fold_right (fun (x, t) ctx -> Env.add x t ctx) args context in 
+                                                                              let arg_ty = List.fold_right (fun (_, t) acc -> TFun (t, acc)) args out_ty in 
+                                                                              let binding_ctxt = if not is_rec then arg_ctxt else Env.add name arg_ty arg_ctxt in 
+                                                                              (match loop binding_ctxt binding with 
+                                                                              | Ok (t_k_plus_1) -> if t_k_plus_1 <> out_ty then assert false else loop (Env.add name arg_ty context) body
+                                                                              | _ -> assert false ) 
+                                                              (* LETFUN *)
+                                                              | None -> let arg_ctxt = List.fold_right (fun (x, t) ctx -> Env.add x t ctx) args context in 
+                                                                        let binding_ctxt = if not is_rec then arg_ctxt else assert false in 
+                                                                        let out_ty = (match loop binding_ctxt binding with 
+                                                                                      | Ok (t_k_plus_1) -> t_k_plus_1 
+                                                                                      | _ -> assert false ) 
+                                                                                      in 
+                                                                        let arg_ty = List.fold_right (fun (_, t) acc -> TFun (t, acc)) args out_ty in 
+                                                                        loop (Env.add name arg_ty context) body
+                                                              ) 
+    | If (e1, e2, e3) -> (match loop context e1, loop context e2, loop context e3 with
+                          | Ok (TBool : ty), Ok (t2), Ok (t3) -> if t2 = t3 then Ok (t2) else assert false
+                          | _ -> assert false)  
+    | Fun (args, e) -> let arg_ctxt = List.fold_right (fun (x, t) ctx -> Env.add x t ctx) args context in 
+                          (match loop arg_ctxt e with 
+                          | Ok (t) -> let out_ty = List.fold_right (fun (_, tk) acc -> TFun (tk, acc)) args t in Ok (out_ty)
+                          | _ -> assert false 
+                          ) 
+    | App (e, e_args) -> (match loop context e with
+                      | Ok (e_out) ->
+                          let rec check_arg_type ty args =
+                            (match ty, args with
+                            | t, [] -> Ok t
+                            | TFun (t_in, t_out), x :: xs -> (match loop context x with
+                                                              | Ok t_arg -> if t_arg = t_in then check_arg_type t_out xs else assert false
+                                                              | _ -> assert false
+                                                              )
+                            | _ -> assert false
+                            )  
+                          in
+                          check_arg_type e_out e_args
+                      | Error _ -> assert false)
+    | Bop (bop, e1, e2) -> (match loop context e1, loop context e2 with
+                            | Ok (TInt : ty), Ok (TInt : ty) -> (match bop with
+                                                                | Add | Sub | Mul | Div | Mod -> Ok (TInt  : ty)
+                                                                | Lt  | Lte | Gt  | Gte | Eq  | Neq -> Ok (TBool : ty)
+                                                                | _ -> assert false
+                                                                )
+                            | Ok (TBool : ty), Ok (TBool : ty) -> (match bop with
+                                                                  | And | Or | Lt | Lte | Gt | Gte | Eq | Neq -> Ok (TBool : ty)
+                                                                  | _ -> assert false
+                                                                  )
+                            | Ok TInt, Ok TInt_list -> (match bop with
+                                                        | Cons -> Ok (TInt_list)
+                                                        | _ -> assert false
+                                                        )
+                            | Ok t1, Ok t2 -> if t1 = t2 then (match bop with
+                                                              | Lt | Lte | Gt | Gte | Eq | Neq -> Ok (TBool : ty)
+                                                              | _ -> assert false
+                                                              )
+                                              else assert false 
+                            | _ -> assert false
+                            )  
+    | Negate (e) -> (match loop context e with 
+                    | Ok (TInt) -> Ok (TInt) 
+                    | _ -> assert false 
+                    ) 
+    | Assert (e) -> (match loop context e with 
+                    | Ok (TBool) -> Ok (TUnit) 
+                    | _ -> assert false 
+                    ) 
+    | Tuple e_list ->
+        let rec out_ty rest = 
+          match rest with
+          | [] -> Ok []
+          | e :: es -> (match loop context e with
+                        | Ok t -> (match out_ty es with
+                                    | Ok ts -> Ok (t :: ts)
+                                    | _ -> assert false 
+                                    )
+                        | Error _ -> assert false
+                        )
+        in
+        (match out_ty e_list with
+         | Ok t_list -> Ok (TTuple t_list)
+         | Error _ -> assert false)
+    | Match _ -> assert false 
+  in loop ctxt e 
 
 let type_of (p : prog) : (ty, Error_msg.t) result =
   let rec go ctxt ty p =
