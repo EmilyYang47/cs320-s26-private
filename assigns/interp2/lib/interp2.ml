@@ -359,7 +359,7 @@ let eval_expr (env : dyn_env) (e : expr) : value =
                                   | Or  -> if v1 then VBool(v1) else VBool(v2)
                                   | _ -> assert false
                                 )
-                            | VBool (v1), v2 ->
+                            | VBool (v1), _ ->
                                 (match bop with
                                   | And -> if not v1 then VBool (false) else assert false   
                                   | Or  -> if v1 then VBool (true) else assert false
