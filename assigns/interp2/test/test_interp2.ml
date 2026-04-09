@@ -19,7 +19,7 @@ let type_of_tests =
     (* ADD MORE TESTS HERE *)
   ]
 
-(* let eval_tests =
+let eval_tests =
   let t expected input =
     assert_equal expected (eval_expr Env.empty (parse_expr input))
   in
@@ -34,13 +34,13 @@ let type_of_tests =
         (VInt 2)
         "let x = 2 in (fun (y : bool) -> x) true");
     (* ADD MORE TESTS HERE *)
-  ] *)
+  ]
 
 let suite =
   "interp1 test suite" >:::
   [
     type_of_tests;
-    (* eval_tests; *)
+    eval_tests;
   ]
 
 let _run = run_test_tt_main suite
