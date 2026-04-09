@@ -332,7 +332,17 @@ let eval_expr (env : dyn_env) (e : expr) : value =
                           )  
     | Fun _ -> assert false 
     | App _ -> assert false 
-    | Bop (bop, e1, e2) -> (match loop environment e1, loop environment e2 with
+    | Bop (bop, e1, e2) -> (match bop with
+                            | And -> (match loop environment e1 with
+                                      | VBool false -> VBool false
+                                      | VBool true  -> loop environment e2
+                                      | _ -> assert false)
+                            | Or  -> (match loop environment e1 with
+                                      | VBool true  -> VBool true
+                                      | VBool false -> loop environment e2
+                                      | _ -> assert false)
+                            | _ -> 
+                          (match loop environment e1, loop environment e2 with
                             | VInt (v1), VInt (v2) ->
                                 (match bop with
                                   | Add -> VInt (v1 + v2)
@@ -355,14 +365,8 @@ let eval_expr (env : dyn_env) (e : expr) : value =
                                   | Lte -> VBool (v1 <= v2)
                                   | Gt  -> VBool (v1 > v2)
                                   | Gte -> VBool (v1 >= v2)
-                                  | And -> if v1 then VBool(v2) else VBool(v1)
-                                  | Or  -> if v1 then VBool(v1) else VBool(v2)
-                                  | _ -> assert false
-                                )
-                            | VBool (v1), _ ->
-                                (match bop with
-                                  | And -> if not v1 then VBool (false) else assert false   
-                                  | Or  -> if v1 then VBool (true) else assert false
+                                  (* | And -> if v1 then VBool(v2) else VBool(v1)
+                                  | Or  -> if v1 then VBool(v1) else VBool(v2) *)
                                   | _ -> assert false
                                 )
                             | v1, v2 -> 
@@ -374,7 +378,7 @@ let eval_expr (env : dyn_env) (e : expr) : value =
                                   | Gt -> VBool (v1 > v2)
                                   | Gte -> VBool (v1 >= v2)
                                   | _ -> assert false) 
-                            )  
+                            )  )
     | Negate (e) -> (match loop environment e with 
                     | VInt (v1) -> VInt (- v1) 
                     | _ -> assert false  
