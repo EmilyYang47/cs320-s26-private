@@ -190,7 +190,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty, Error_msg.t) result =
                                                                               let arg_ty = List.fold_right (fun (_, t) acc -> TFun (t, acc)) args out_ty in 
                                                                               let binding_ctxt = if not is_rec then arg_ctxt else Env.add name arg_ty arg_ctxt in 
                                                                               (match loop binding_ctxt binding with 
-                                                                              | Ok (t_k_plus_1) -> if t_k_plus_1 <> out_ty then assert false else loop (Env.add name arg_ty context) body
+                                                                              | Ok (t_k_plus_1) -> if t_k_plus_1 <> out_ty then Error (exp_ty binding.pos t_k_plus_1 out_ty) else loop (Env.add name arg_ty context) body
                                                                               | Error e -> Error e)
                                                               (* LETFUN *)
                                                               | None -> if is_rec then Error (missing_rec_annot exp.pos)
@@ -217,40 +217,45 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty, Error_msg.t) result =
                           | Ok (t) -> let out_ty = List.fold_right (fun (_, tk) acc -> TFun (tk, acc)) args t in Ok (out_ty)
                           | Error e -> Error e
                           ) 
-    | App (e, e_args) -> (match loop context e with
-                      | Ok (e_out) ->
-                          let rec check_arg_type ty args =
-                            (match ty, args with
-                            | t, [] -> Ok t
-                            | TFun (t_in, t_out), x :: xs -> (match loop context x with
-                                                              | Ok t_arg -> if t_arg = t_in then check_arg_type t_out xs else assert false
-                                                              | _ -> assert false
-                                                              )
-                            | _ -> assert false
-                            )  
-                          in
-                          check_arg_type e_out e_args
-                      | Error _ -> assert false)
+    | App (e, e_args) ->
+                        (match loop context e with
+                        | Error err -> Error err
+                        | Ok e_out ->
+                            let rec check_arg_type ty args =
+                              match ty, args with
+                              | t, [] -> Ok t
+                              | TFun (t_in, t_out), x :: xs ->
+                                  (match loop context x with
+                                    | Error err -> Error err
+                                    | Ok t_arg ->
+                                        if t_arg = t_in then check_arg_type t_out xs
+                                        else Error (exp_ty x.pos t_arg t_in))
+                              | t, _ -> Error (too_many_args exp.pos t)
+                            in
+                            (match e_out with
+                              | TFun _ -> check_arg_type e_out e_args
+                              | t -> if e_args = [] then Ok t else Error (not_func e.pos t)))
     | Bop (bop, e1, e2) -> (match loop context e1, loop context e2 with
+                            | Error e, _ -> Error e
+                            | _, Error e -> Error e
                             | Ok (TInt : ty), Ok (TInt : ty) -> (match bop with
                                                                 | Add | Sub | Mul | Div | Mod -> Ok (TInt  : ty)
                                                                 | Lt  | Lte | Gt  | Gte | Eq  | Neq -> Ok (TBool : ty)
-                                                                | _ -> assert false
+                                                                | _ -> Error (exp_ty e2.pos TInt TBool)
                                                                 )
                             | Ok (TBool : ty), Ok (TBool : ty) -> (match bop with
                                                                   | And | Or | Lt | Lte | Gt | Gte | Eq | Neq -> Ok (TBool : ty)
-                                                                  | _ -> assert false
+                                                                  | _ -> Error (exp_ty e2.pos TBool TInt)
                                                                   )
                             | Ok TInt, Ok TInt_list -> (match bop with
                                                         | Cons -> Ok (TInt_list)
-                                                        | _ -> assert false
+                                                        | _ -> Error (exp_ty e2.pos TInt_list TInt)
                                                         )
                             | Ok t1, Ok t2 -> if t1 = t2 then (match bop with
                                                               | Lt | Lte | Gt | Gte | Eq | Neq -> Ok (TBool : ty)
-                                                              | _ -> assert false
+                                                              | _ -> Error (exp_ty e2.pos t2 TInt)
                                                               )
-                                              else assert false 
-                            | _ -> assert false
+                                              else Error (exp_ty e2.pos t2 t1)
                             )  
     | Negate (e) -> (match loop context e with 
                     | Ok (TInt) -> Ok (TInt) 
@@ -269,14 +274,14 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty, Error_msg.t) result =
           | e :: es -> (match loop context e with
                         | Ok t -> (match out_ty es with
                                     | Ok ts -> Ok (t :: ts)
-                                    | _ -> assert false 
+                                    | Error e -> Error e
                                     )
-                        | Error _ -> assert false
+                        | Error e -> Error e
                         )
         in
         (match out_ty e_list with
          | Ok t_list -> Ok (TTuple t_list)
-         | Error _ -> assert false)
+         | Error e -> Error e)
     | Match _ -> assert false 
   in loop ctxt e 
 
