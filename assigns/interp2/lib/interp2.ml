@@ -230,7 +230,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty, Error_msg.t) result =
                                     | Ok t_arg ->
                                         if t_arg = t_in then check_arg_type t_out xs
                                         else Error (exp_ty x.pos t_arg t_in))
-                              | t, _ -> Error (too_many_args exp.pos t)
+                              | t, _ -> Error (too_many_args e.pos t)
                             in
                             (match e_out with
                               | TFun _ -> check_arg_type e_out e_args
@@ -259,12 +259,12 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty, Error_msg.t) result =
                             )  
     | Negate (e) -> (match loop context e with 
                     | Ok (TInt) -> Ok (TInt) 
-                    | Ok t -> Error (exp_ty exp.pos t TInt) 
+                    | Ok t -> Error (exp_ty e.pos t TInt) 
                     | Error e -> Error e
                     ) 
     | Assert (e) -> (match loop context e with 
                     | Ok (TBool) -> Ok (TUnit) 
-                    | Ok t -> Error (exp_ty exp.pos t TBool)  
+                    | Ok t -> Error (exp_ty e.pos t TBool)  
                     | Error e -> Error e 
                     ) 
     | Tuple e_list ->
