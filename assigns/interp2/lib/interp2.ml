@@ -182,7 +182,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty, Error_msg.t) result =
                                                         (* LET *)
                                                         then (match (loop context binding) with 
                                                           | Ok (t1) -> loop (Env.add name t1 context) body 
-                                                          | _ -> assert false 
+                                                          | Error e -> Error e 
                                                         ) 
                                                         else (match annot with 
                                                               (* LETFUNANNOT & LETREC *) 
@@ -191,24 +191,31 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty, Error_msg.t) result =
                                                                               let binding_ctxt = if not is_rec then arg_ctxt else Env.add name arg_ty arg_ctxt in 
                                                                               (match loop binding_ctxt binding with 
                                                                               | Ok (t_k_plus_1) -> if t_k_plus_1 <> out_ty then assert false else loop (Env.add name arg_ty context) body
-                                                                              | _ -> assert false ) 
+                                                                              | Error e -> Error e)
                                                               (* LETFUN *)
-                                                              | None -> let arg_ctxt = List.fold_right (fun (x, t) ctx -> Env.add x t ctx) args context in 
-                                                                        let binding_ctxt = if not is_rec then arg_ctxt else assert false in 
-                                                                        let out_ty = (match loop binding_ctxt binding with 
-                                                                                      | Ok (t_k_plus_1) -> t_k_plus_1 
-                                                                                      | _ -> assert false ) 
-                                                                                      in 
-                                                                        let arg_ty = List.fold_right (fun (_, t) acc -> TFun (t, acc)) args out_ty in 
-                                                                        loop (Env.add name arg_ty context) body
+                                                              | None -> if is_rec then Error (missing_rec_annot exp.pos)
+                                                                        else
+                                                                          let arg_ctxt = List.fold_right (fun (x, t) ctx -> Env.add x t ctx) args context in
+                                                                          (match loop arg_ctxt binding with
+                                                                          | Ok out_ty ->
+                                                                              let arg_ty = List.fold_right (fun (_, t) acc -> TFun (t, acc)) args out_ty in
+                                                                              loop (Env.add name arg_ty context) body
+                                                                          | Error e -> Error e)
                                                               ) 
-    | If (e1, e2, e3) -> (match loop context e1, loop context e2, loop context e3 with
-                          | Ok (TBool : ty), Ok (t2), Ok (t3) -> if t2 = t3 then Ok (t2) else assert false
-                          | _ -> assert false)  
+    | If (e1, e2, e3) -> (match loop context e1 with
+                          | Error e -> Error e
+                          | Ok TBool ->
+                              (match loop context e2, loop context e3 with
+                                | Error e, _ -> Error e
+                                | _, Error e -> Error e
+                                | Ok t2, Ok t3 ->
+                                    if t2 = t3 then Ok t2
+                                    else Error (exp_ty e3.pos t3 t2))
+                          | Ok t -> Error (exp_ty e1.pos t TBool))
     | Fun (args, e) -> let arg_ctxt = List.fold_right (fun (x, t) ctx -> Env.add x t ctx) args context in 
                           (match loop arg_ctxt e with 
                           | Ok (t) -> let out_ty = List.fold_right (fun (_, tk) acc -> TFun (tk, acc)) args t in Ok (out_ty)
-                          | _ -> assert false 
+                          | Error e -> Error e
                           ) 
     | App (e, e_args) -> (match loop context e with
                       | Ok (e_out) ->
