@@ -176,7 +176,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty, Error_msg.t) result =
     | Nil   -> Ok (TInt_list : ty) 
     | Var x -> (match Env.find_opt x context with
                 | Some t -> Ok t
-                | None   -> assert false
+                | None   -> Error (unknown_var exp.pos x)
               )
     | Let {is_rec; name; args; annot; binding; body} -> if not is_rec && (args = []) 
                                                         (* LET *)
@@ -247,11 +247,13 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty, Error_msg.t) result =
                             )  
     | Negate (e) -> (match loop context e with 
                     | Ok (TInt) -> Ok (TInt) 
-                    | _ -> assert false 
+                    | Ok t -> Error (exp_ty exp.pos t TInt) 
+                    | Error e -> Error e
                     ) 
     | Assert (e) -> (match loop context e with 
                     | Ok (TBool) -> Ok (TUnit) 
-                    | _ -> assert false 
+                    | Ok t -> Error (exp_ty exp.pos t TBool)  
+                    | Error e -> Error e 
                     ) 
     | Tuple e_list ->
         let rec out_ty rest = 
