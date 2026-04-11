@@ -347,14 +347,24 @@ let eval_expr (env : dyn_env) (e : expr) : value =
                           )  
     (* | Fun _ -> assert false 
     | App _ -> assert false  *)
-    | Fun (args, body) ->
-        VClos {
-          env = environment;
-          name = None;
-          args = List.map fst args;
-          body;
-        }
-    | App (e1, e_args) ->
+    | Fun (args, e) -> VClos {env = environment; name = None; args = List.map fst args; body = e}
+    | App (e1, e_args) -> let v1 = loop environment e1 in 
+                          let v_args = List.map (loop environment) e_args in 
+                          (match v1 with
+                            | VClos {env = env2; name; args; body = e} -> 
+                                    let rec get_env3 env args vals = 
+                                      match args, vals with 
+                                      | [], [] -> env
+                                      | ar :: ars, v :: vs -> get_env3 (Env.add ar v env) ars vs
+                                      | _ -> assert false
+                                    in
+                                    let env3 = get_env3 env2 args v_args in
+                                    let env3 = match name with
+                                      | Some n -> Env.add n v1 env3
+                                      | None   -> env3
+                                    in
+                                    loop env3 e
+                            | _ -> assert false) 
     | Bop (bop, e1, e2) -> (match bop with
                             | And -> (match loop environment e1 with
                                       | VBool false -> VBool false
