@@ -322,16 +322,39 @@ let eval_expr (env : dyn_env) (e : expr) : value =
     | Unit  -> VUnit  
     | Bool b -> VBool b 
     | Int n -> VInt n 
-    | Nil -> assert false 
+    | Nil -> VInt_list [] 
     | Var x -> Env.find x environment (* For this part, I googled "Ocaml, Map.male (String)" and it taught me about the common operations of map module *)
-    | Let _ -> assert false  
+    | Let {is_rec; name; args; binding; body; _} -> if not is_rec && (args = []) 
+                                                        (* LETE *)
+                                                        then let v1 = loop environment binding in 
+                                                            let env2 = Env.add name v1 environment in 
+                                                            loop env2 body 
+                                                        else
+                                                            (* LETRECE *)
+                                                            let arg_names = List.map fst args in
+                                                            let fval = VClos { env = environment; name = if is_rec then Some name else None; args = arg_names; body = binding } in
+                                                            let closure = Env.add name fval environment in
+                                                            let fval_out =
+                                                              if is_rec then VClos { env = closure; name = Some name; args = arg_names; body = binding }
+                                                              else fval
+                                                            in
+                                                            let env2 = Env.add name fval_out environment in
+                                                            loop env2 body
     | If (e1, e2, e3) -> (match loop environment e1 with
                           | VBool true  -> loop environment e2
                           | VBool false -> loop environment e3
                           | _ -> assert false 
                           )  
-    | Fun _ -> assert false 
-    | App _ -> assert false 
+    (* | Fun _ -> assert false 
+    | App _ -> assert false  *)
+    | Fun (args, body) ->
+        VClos {
+          env = environment;
+          name = None;
+          args = List.map fst args;
+          body;
+        }
+    | App (e1, e_args) ->
     | Bop (bop, e1, e2) -> (match bop with
                             | And -> (match loop environment e1 with
                                       | VBool false -> VBool false
@@ -369,6 +392,10 @@ let eval_expr (env : dyn_env) (e : expr) : value =
                                   | Or  -> if v1 then VBool(v1) else VBool(v2) *)
                                   | _ -> assert false
                                 )
+                            | VInt v1, VInt_list vs ->
+                                  (match bop with
+                                    | Cons -> VInt_list (v1 :: vs)
+                                    | _ -> assert false)
                             | v1, v2 -> 
                                   (match bop with 
                                   | Eq  -> VBool (v1 = v2) 
@@ -388,7 +415,7 @@ let eval_expr (env : dyn_env) (e : expr) : value =
                     | VBool (false) -> raise (Assert_fail exp.pos)
                     | _ -> assert false  
                     ) 
-    | Tuple _ -> assert false 
+    | Tuple e_list -> VTuple (List.map (loop environment) e_list)
     | Match _ -> assert false 
   in loop env e 
 
