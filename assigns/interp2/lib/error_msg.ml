@@ -48,7 +48,7 @@ let to_string ?filename ?text t =
       filename
       t.line_num
       t.col_num
-      (t.col_num + t.underline_width - 1)
+      (t.col_num + t.underline_width)
   in
   if t.dummy
   then err_msg_first_line

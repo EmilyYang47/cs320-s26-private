@@ -26,7 +26,7 @@ let rec pp_ty ppf ty =
   | TBool -> pf ppf "bool"
   | TInt -> pf ppf "int"
   | TFun (t1, t2) -> pf ppf "%a -> %a" pp_parens t1 pp_ty t2
-  | TTuple ts -> list ~sep:(Fmt.any "*@ ") pp_ty ppf ts
+  | TTuple ts -> list ~sep:(Fmt.any " * ") pp_ty ppf ts
   | TInt_list -> pf ppf "int list"
 
 type _pattern = Ast.Interp2._pattern =
@@ -125,7 +125,7 @@ let exp_tuple_pat pos t =
 let exp_diff_tuple_pat pos ty =
   let msg =
     Format.asprintf
-      "This pattern matches values of a tuple type but a pattern was expected which matches values of different tuple type %a"
+      "This pattern matches values of a tuple type but a pattern was expected which matches values of a different tuple type %a"
       pp_ty ty
   in Error_msg.mk pos msg
 
