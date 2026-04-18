@@ -230,7 +230,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty, Error_msg.t) result =
                                     | Ok t_arg ->
                                         if t_arg = t_in then check_arg_type t_out xs
                                         else Error (exp_ty x.pos t_arg t_in))
-                              | t, _ -> Error (too_many_args e.pos t)
+                              | t, _ :: _ -> Error (too_many_args e.pos t)
                             in
                             (match e_out with
                               | TFun _ -> check_arg_type e_out e_args
