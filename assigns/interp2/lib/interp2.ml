@@ -285,39 +285,47 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty, Error_msg.t) result =
         (match loop context e with
         | Error err -> Error err
         | Ok t_scrut ->
-              let rec bind_pattern (context : ctxt) (pat : pattern) (t : ty) (pos : pos) : (ctxt, Error_msg.t) result =
-                  (match pat.pattern, t with
-                  | PUnit, TUnit -> Ok context
-                  | PBool _, TBool -> Ok context
-                  | PInt _, TInt -> Ok context
-                  | PNil, TInt_list -> Ok context
-                  | PVar x, t -> Ok (Env.add x t context)
-                  | PCons (p_head, p_tail), TInt_list ->
-                      (match bind_pattern context p_head TInt pos with
-                      | Error err -> Error err
-                      | Ok ctx -> bind_pattern ctx p_tail TInt_list pos)
-                  | PTuple ps, TTuple ts ->
-                      if List.length ps <> List.length ts
-                      then Error (exp_diff_tuple_pat pat.pos t)
-                      else List.fold_left2
-                            (fun acc p ti ->
-                              match acc with
-                              | Error err -> Error err
-                              | Ok ctx -> bind_pattern ctx p ti pos)
-                            (Ok context) ps ts
-                  | PTuple _, t -> Error (exp_tuple_pat pat.pos t)
-                  | _, t_expected -> Error (exp_pat pat.pos t t_expected))
+              let rec bind_pattern (context : ctxt) (pat : pattern) (t : ty) (pos : pos) (bound : string list) : (ctxt * string list, Error_msg.t) result =
+                match pat.pattern, t with
+                | PUnit, TUnit -> Ok (context, bound)
+                | PBool _, TBool -> Ok (context, bound)
+                | PInt _, TInt -> Ok (context, bound)
+                | PNil, TInt_list -> Ok (context, bound)
+                | PVar "_", t -> Ok (Env.add "_" t context, bound)  (* wildcard: skip dup check *)
+                | PVar x, t ->
+                    if List.mem x bound
+                    then Error (bound_several_times pat.pos x)
+                    else Ok (Env.add x t context, x :: bound)
+                | PCons (p_head, p_tail), TInt_list ->
+                    (match bind_pattern context p_head TInt pos bound with
+                    | Error err -> Error err
+                    | Ok (ctx, bound') -> bind_pattern ctx p_tail TInt_list pos bound')
+                | PTuple ps, TTuple ts ->
+                    if List.length ps <> List.length ts
+                    then Error (exp_diff_tuple_pat pat.pos t)
+                    else List.fold_left2
+                          (fun acc p ti ->
+                            match acc with
+                            | Error err -> Error err
+                            | Ok (ctx, bound') -> bind_pattern ctx p ti pos bound')
+                          (Ok (context, bound)) ps ts
+                | PTuple _, t -> Error (exp_tuple_pat pat.pos t)
+                | PCons _, t -> Error (exp_pat pat.pos TInt_list t)
+                | PUnit, t -> Error (exp_pat pat.pos TUnit t)
+                | PBool _, t -> Error (exp_pat pat.pos TBool t)
+                | PInt _, t -> Error (exp_pat pat.pos TInt t)
+                | PNil, t -> Error (exp_pat pat.pos TInt_list t)
             in
             let rec check_branches = function
-              | [] -> assert false 
+              | [] -> assert false
               | [(pat, body)] ->
-                  (match bind_pattern context pat t_scrut exp.pos with
+                  (match bind_pattern context pat t_scrut exp.pos [] with
                   | Error err -> Error err
-                  | Ok pat_ctxt -> loop pat_ctxt body)
+                  | Ok (pat_ctxt, _) -> loop pat_ctxt body)
               | (pat, body) :: rest ->
-                  (match bind_pattern context pat t_scrut exp.pos with
+                  (match bind_pattern context pat t_scrut exp.pos [] with
                   | Error err -> Error err
-                  | Ok pat_ctxt ->
+                  | Ok (pat_ctxt, _) ->
                       (match loop pat_ctxt body with
                       | Error err -> Error err
                       | Ok t_branch ->

@@ -360,6 +360,67 @@ let type_of_tests =
     (fun _ -> t (Ok TInt)
         "match 1 :: 2 :: [] with | [] -> 0 | x :: _ -> x");
 
+    (* ── Match errors ── *)
+    "match_unit_pat_on_int_err" >::
+    (fun _ ->
+      match type_of_expr Env.empty (parse_expr "match 1 with | () -> 1") with
+      | Error _ -> ()
+      | Ok _ -> assert_failure "expected error: unit pattern on int scrutinee");
+
+    "match_bool_pat_on_int_err" >::
+    (fun _ ->
+      match type_of_expr Env.empty (parse_expr "match 1 with | true -> 1") with
+      | Error _ -> ()
+      | Ok _ -> assert_failure "expected error: bool pattern on int scrutinee");
+
+    "match_nil_pat_on_int_err" >::
+    (fun _ ->
+      match type_of_expr Env.empty (parse_expr "match 1 with | [] -> 1") with
+      | Error _ -> ()
+      | Ok _ -> assert_failure "expected error: list pattern on int scrutinee");
+
+    "match_cons_pat_bound_several_times_err" >::
+    (fun _ ->
+      match type_of_expr Env.empty (parse_expr "match [] with | x :: x -> x") with
+      | Error _ -> ()
+      | Ok _ -> assert_failure "expected error: x bound several times in cons pattern");
+
+    "match_tuple_pat_bound_several_times_err" >::
+    (fun _ ->
+      match type_of_expr Env.empty (parse_expr "match (1,2) with | (a,a) -> a") with
+      | Error _ -> ()
+      | Ok _ -> assert_failure "expected error: a bound several times in tuple pattern");
+
+    "match_diff_tuple_arity_err" >::
+    (fun _ ->
+      match type_of_expr Env.empty (parse_expr "match (1,2,3) with | (a,b) -> a") with
+      | Error _ -> ()
+      | Ok _ -> assert_failure "expected error: tuple arity mismatch");
+
+    "match_tuple_pat_on_int_err" >::
+    (fun _ ->
+      match type_of_expr Env.empty (parse_expr "match 1 with | (a,b) -> a") with
+      | Error _ -> ()
+      | Ok _ -> assert_failure "expected error: tuple pattern on int scrutinee");
+
+    "match_branch_body_mismatch_err" >::
+    (fun _ ->
+      match type_of_expr Env.empty (parse_expr "match 1 with | 0 -> true | x -> x") with
+      | Error _ -> ()
+      | Ok _ -> assert_failure "expected error: int body but bool expected");
+
+    "match_body_subexpr_err" >::
+    (fun _ ->
+      match type_of_expr Env.empty (parse_expr "match 1 with | x -> x + true") with
+      | Error _ -> ()
+      | Ok _ -> assert_failure "expected error: bool used as int in body");
+
+    "match_second_branch_subexpr_err" >::
+    (fun _ ->
+      match type_of_expr Env.empty (parse_expr "match 1 with | 0 -> 1 | x -> x + true") with
+      | Error _ -> ()
+      | Ok _ -> assert_failure "expected error: bool used as int in second branch body");
+
     (* ── Complex / integration ── *)
     "higher_order_fun" >::
     (fun _ -> t (Ok TInt)
@@ -376,22 +437,6 @@ let type_of_tests =
     "nested_let" >::
     (fun _ -> t (Ok TInt)
         "let x = 1 in let y = x + 1 in let z = y + 1 in z");
-(* 
-    (* match 错误 - pattern 类型不匹配 *)
-    let _ = match 1 with | () -> 1  (* unit but int *) 
-    let _ = match 1 with | true -> 1  (* bool but int *) 
-    let _ = match 1 with | [] -> 1  (* int list but int *) 
-    let _ = match [] with | x :: x -> x  (* x bound several times *)
-    let _ = match (1,2) with | (a,a) -> a  (* a bound several times *)
-    let _ = match (1,2,3) with | (a,b) -> a  (* diff tuple type *)
-    let _ = match 1 with | (a,b) -> a  tuple but int
-
-    (* match 错误 - branch 类型不一致 *)
-    let _ = match 1 with | 0 -> true | x -> x  (* int but bool *)
-
-    (* match 错误 - body 里有 subexpression error *)
-    let _ = match 1 with | x -> x + true  (* bool but int *)
-    let _ = match 1 with | 0 -> 1 | x -> x + true  bool but int *)
 
   ]
 
@@ -399,14 +444,12 @@ let type_of_tests =
 (* ================================================================
    EVAL TESTS
    ================================================================ *)
-
-(* let eval_tests =
+(* 
+let eval_tests =
   let t expected input =
     assert_equal expected (eval_expr Env.empty (parse_expr input))
   in
-  let t_exn exn input =
-    assert_raises exn (fun () -> eval_expr Env.empty (parse_expr input))
-  in
+
   "eval tests" >:::
   [
 
