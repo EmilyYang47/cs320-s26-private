@@ -192,7 +192,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
 let rec nub l =
   match l with
   | [] -> []
-  | x :: xs -> List.filter ((<>) x) (nub xs)
+  | x :: xs -> x :: List.filter ((<>) x) (nub xs)
 
 let free_vars =
   let rec go = function
@@ -306,7 +306,7 @@ let interp ~(filename : string) : (value, Error_msg.t) result =
 *)
 
 let parse_expr s =
-  let s = "let _ = " ^ s in
+  let s = "let _x = " ^ s in
   match Parser.prog Lexer.read (Lexing.from_string s) with
   | [{pos=_;stmt=SLet {binding=e;_}}] -> e
   | _ -> assert false
