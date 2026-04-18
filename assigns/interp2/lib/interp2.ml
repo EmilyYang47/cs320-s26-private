@@ -238,24 +238,23 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty, Error_msg.t) result =
     | Bop (bop, e1, e2) -> (match loop context e1, loop context e2 with
                             | Error e, _ -> Error e
                             | _, Error e -> Error e
-                            | Ok (TInt : ty), Ok (TInt : ty) -> (match bop with
-                                                                | Add | Sub | Mul | Div | Mod -> Ok (TInt  : ty)
-                                                                | Lt  | Lte | Gt  | Gte | Eq  | Neq -> Ok (TBool : ty)
-                                                                | _ -> Error (exp_ty e2.pos TInt TBool)
-                                                                )
-                            | Ok (TBool : ty), Ok (TBool : ty) -> (match bop with
-                                                                  | And | Or | Lt | Lte | Gt | Gte | Eq | Neq -> Ok (TBool : ty)
-                                                                  | _ -> Error (exp_ty e2.pos TBool TInt)
-                                                                  )
-                            | Ok TInt, Ok TInt_list -> (match bop with
-                                                        | Cons -> Ok (TInt_list)
-                                                        | _ -> Error (exp_ty e2.pos TInt_list TInt)
-                                                        )
-                            | Ok t1, Ok t2 -> if t1 = t2 then (match bop with
-                                                              | Lt | Lte | Gt | Gte | Eq | Neq -> Ok (TBool : ty)
-                                                              | _ -> Error (exp_ty e2.pos t2 TInt)
-                                                              )
-                                              else Error (exp_ty e2.pos t2 t1)
+                            | Ok t1, Ok t2 ->
+                                            (match bop, t1, t2 with
+                                            | (Add | Sub | Mul | Div | Mod), TInt, TInt -> Ok TInt
+                                            | (Lt | Lte | Gt | Gte | Eq | Neq), TInt, TInt -> Ok TBool
+                                            | (And | Or), TBool, TBool -> Ok TBool
+                                            | (Eq | Neq), TBool, TBool -> Ok TBool
+                                            | Cons, TInt, TInt_list -> Ok TInt_list
+                                            | (Add | Sub | Mul | Div | Mod), t, TInt -> Error (exp_ty e1.pos t TInt)
+                                            | (Add | Sub | Mul | Div | Mod), TInt, t -> Error (exp_ty e2.pos t TInt)
+                                            | (Add | Sub | Mul | Div | Mod), t, _ -> Error (exp_ty e1.pos t TInt)
+                                            | (And | Or), t, TBool -> Error (exp_ty e1.pos t TBool)
+                                            | (And | Or), TBool, t -> Error (exp_ty e2.pos t TBool)
+                                            | (And | Or), t, _ -> Error (exp_ty e1.pos t TBool)
+                                            | Cons, TInt, t -> Error (exp_ty e2.pos t TInt_list)
+                                            | Cons, t, _ -> Error (exp_ty e1.pos t TInt)
+                                            | (Lt | Lte | Gt | Gte | Eq | Neq), t1, t2 -> if t1 = t2 then Ok TBool else Error (exp_ty e2.pos t2 t1)
+                                            )
                             )  
     | Negate (e) -> (match loop context e with 
                     | Ok (TInt) -> Ok (TInt) 
@@ -282,7 +281,53 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty, Error_msg.t) result =
         (match out_ty e_list with
          | Ok t_list -> Ok (TTuple t_list)
          | Error e -> Error e)
-    | Match _ -> assert false 
+    | Match (e, branches) ->
+        (match loop context e with
+        | Error err -> Error err
+        | Ok t_scrut ->
+              let rec bind_pattern (context : ctxt) (pat : pattern) (t : ty) (pos : pos) : (ctxt, Error_msg.t) result =
+                  (match pat.pattern, t with
+                  | PUnit, TUnit -> Ok context
+                  | PBool _, TBool -> Ok context
+                  | PInt _, TInt -> Ok context
+                  | PNil, TInt_list -> Ok context
+                  | PVar x, t -> Ok (Env.add x t context)
+                  | PCons (p_head, p_tail), TInt_list ->
+                      (match bind_pattern context p_head TInt pos with
+                      | Error err -> Error err
+                      | Ok ctx -> bind_pattern ctx p_tail TInt_list pos)
+                  | PTuple ps, TTuple ts ->
+                      if List.length ps <> List.length ts
+                      then Error (exp_diff_tuple_pat pat.pos t)
+                      else List.fold_left2
+                            (fun acc p ti ->
+                              match acc with
+                              | Error err -> Error err
+                              | Ok ctx -> bind_pattern ctx p ti pos)
+                            (Ok context) ps ts
+                  | PTuple _, t -> Error (exp_tuple_pat pat.pos t)
+                  | _, t_expected -> Error (exp_pat pat.pos t t_expected))
+            in
+            let rec check_branches = function
+              | [] -> assert false 
+              | [(pat, body)] ->
+                  (match bind_pattern context pat t_scrut exp.pos with
+                  | Error err -> Error err
+                  | Ok pat_ctxt -> loop pat_ctxt body)
+              | (pat, body) :: rest ->
+                  (match bind_pattern context pat t_scrut exp.pos with
+                  | Error err -> Error err
+                  | Ok pat_ctxt ->
+                      (match loop pat_ctxt body with
+                      | Error err -> Error err
+                      | Ok t_branch ->
+                          (match check_branches rest with
+                          | Error err -> Error err
+                          | Ok t_rest ->
+                              if t_branch = t_rest then Ok t_branch
+                              else Error (exp_ty body.pos t_branch t_rest))))
+            in
+            check_branches branches)
   in loop ctxt e 
 
 let type_of (p : prog) : (ty, Error_msg.t) result =
