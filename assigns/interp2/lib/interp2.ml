@@ -416,7 +416,7 @@ let eval_expr (env : dyn_env) (e : expr) : value =
     (* | Fun _ -> assert false 
     | App _ -> assert false  *)
     | Fun (args, e) -> VClos {env = environment; name = None; args = List.map fst args; body = e}
-    | App (e1, e_args) -> let v1 = loop environment e1 in 
+    (* | App (e1, e_args) -> let v1 = loop environment e1 in 
                           let v_args = List.map (loop environment) e_args in 
                           (match v1 with
                             | VClos {env = env2; name; args; body = e} -> 
@@ -432,7 +432,33 @@ let eval_expr (env : dyn_env) (e : expr) : value =
                                       | None   -> env3
                                     in
                                     loop env3 e
-                            | _ -> assert false) 
+                            | _ -> assert false)  *)
+    | App (e1, e_args) -> 
+                    let v1 = loop environment e1 in 
+                    let v_args = List.map (loop environment) e_args in 
+                    (match v1 with
+                    | VClos {env = env2; name; args; body = e} ->
+                        let rec get_env3 env args vals = 
+                          match args, vals with 
+                          | [], [] -> env
+                          | ar :: ars, v :: vs -> get_env3 (Env.add ar v env) ars vs
+                          | _ -> assert false
+                        in
+                        let n_args = List.length args in
+                        let n_vals = List.length v_args in
+                        if n_vals < n_args then
+                          let applied = List.filteri (fun i _ -> i < n_vals) args in
+                          let remaining = List.filteri (fun i _ -> i >= n_vals) args in
+                          let env3 = List.fold_left2 (fun env a v -> Env.add a v env) env2 applied v_args in
+                          VClos {env = env3; name; args = remaining; body = e}
+                        else
+                          let env3 = get_env3 env2 args v_args in
+                          let env3 = match name with
+                            | Some n -> Env.add n v1 env3
+                            | None   -> env3
+                          in
+                          loop env3 e
+                    | _ -> assert false)
     | Bop (bop, e1, e2) -> (match bop with
                             | And -> (match loop environment e1 with
                                       | VBool false -> VBool false
@@ -494,7 +520,38 @@ let eval_expr (env : dyn_env) (e : expr) : value =
                     | _ -> assert false  
                     ) 
     | Tuple e_list -> VTuple (List.map (loop environment) e_list)
-    | Match _ -> assert false 
+    | Match (e, branches) ->
+                    let rec bind_pat (env : dyn_env) (pat : pattern) (v : value) : dyn_env option =
+                      match pat.pattern, v with
+                      | PUnit, VUnit -> Some env
+                      | PBool b1, VBool b2 -> if b1 = b2 then Some env else None
+                      | PInt n1, VInt n2 -> if n1 = n2 then Some env else None
+                      | PNil, VInt_list [] -> Some env
+                      | PVar "_", _ -> Some env  (* wildcard: match anything, don't bind *)
+                      | PVar x, v -> Some (Env.add x v env)
+                      | PCons (p_head, p_tail), VInt_list (x :: xs) ->
+                          (match bind_pat env p_head (VInt x) with
+                          | None -> None
+                          | Some env' -> bind_pat env' p_tail (VInt_list xs))
+                      | PTuple ps, VTuple vs ->
+                          if List.length ps <> List.length vs then None
+                          else List.fold_left2
+                                (fun acc p v ->
+                                  match acc with
+                                  | None -> None
+                                  | Some env' -> bind_pat env' p v)
+                                (Some env) ps vs
+                      | _ -> None
+                    in
+                    let v_scrut = loop environment e in
+                    let rec try_branches = function
+                      | [] -> raise (Match_fail exp.pos)
+                      | (pat, body) :: rest ->
+                          (match bind_pat environment pat v_scrut with
+                          | None -> try_branches rest
+                          | Some env' -> loop env' body)
+                    in
+                    try_branches branches
   in loop env e 
 
 let eval (p : prog) : value =
