@@ -193,7 +193,8 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty, Error_msg.t) result =
                                                                               | Ok (t_k_plus_1) -> if t_k_plus_1 <> out_ty then Error (exp_ty binding.pos t_k_plus_1 out_ty) else loop (Env.add name arg_ty context) body
                                                                               | Error e -> Error e)
                                                               (* LETFUN *)
-                                                              | None -> if is_rec then Error (missing_rec_annot exp.pos)
+                                                              | None -> if is_rec && args = [] then Error (missing_rec_arg exp.pos)
+                                                                        else if is_rec then Error (missing_rec_annot exp.pos)
                                                                         else
                                                                           let arg_ctxt = List.fold_right (fun (x, t) ctx -> Env.add x t ctx) args context in
                                                                           (match loop arg_ctxt binding with

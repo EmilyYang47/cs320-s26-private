@@ -298,6 +298,12 @@ let type_of_tests =
     "letfun_returns_bool" >::
     (fun _ -> t (Ok TBool) "let pos (x : int) = x > 0 in pos 5");
 
+    "letrec_no_args_err" >::
+(fun _ ->
+  match type_of_expr Env.empty (parse_expr "let rec x = 5 in x") with
+  | Error _ -> ()
+  | Ok _ -> assert_failure "expected error: rec with no args");
+
     (* ── Let fun (with annotation) ── *)
     "letfun_annot_int" >::
     (fun _ -> t (Ok TInt) "let f (x : int) : int = x in f 0");
