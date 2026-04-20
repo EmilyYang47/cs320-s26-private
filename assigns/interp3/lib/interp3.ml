@@ -94,9 +94,9 @@ module Env = Map.Make(String)
    ----------------------------------------------------------------------
 *)
 
-let dummy_error _ _ = Error_msg.mk dummy_pos "Dummy error"
+let dummy_error = Error_msg.mk dummy_pos "Dummy error"
 
-let unknown_var pos x _ _ = Error_msg.mk pos (Format.asprintf "Unbound value %s" x)
+let unknown_var pos x = Error_msg.mk pos (Format.asprintf "Unbound value %s" x)
 
 let exp_ty pos t1 t2 =
   let msg =
@@ -105,31 +105,21 @@ let exp_ty pos t1 t2 =
       Ast.Type.pp t1 Ast.Type.pp t2
   in Error_msg.mk pos msg
 
-let not_func pos ty _ =
-  let msg =
-    Format.asprintf
-      "This expression has type %a. This is not a function; it cannot be applied"
-      Ast.Type.pp ty
-  in Error_msg.mk pos msg
+let invalid_app pos = Error_msg.mk pos "Invalid application"
 
-let unknown_cons pos x _ _ = Error_msg.mk pos (Format.asprintf "Unbound constructor %s" x)
+let invalid_tuple pos = Error_msg.mk pos "Invalid tuple"
 
-let cons_exp_no_args pos x _ _ =
+let unknown_cons pos x = Error_msg.mk pos (Format.asprintf "Unbound constructor %s" x)
+
+let cons_exp_no_args pos x =
   Error_msg.mk
     pos
     (Format.asprintf "The constructor %s expects 0 arguments" x)
 
-let cons_exp_args pos x _ _ =
+let cons_exp_args pos x =
   Error_msg.mk
     pos
     (Format.asprintf "The constructor %s expects arguments" x)
-
-let too_many_args pos ty _ =
-  let msg =
-    Format.asprintf
-      "This function has type %a. It is applied to to many arguments"
-      Ast.Type.pp ty
-  in Error_msg.mk pos msg
 
 let exp_pat pos t1 t2 =
   let msg =
@@ -138,21 +128,7 @@ let exp_pat pos t1 t2 =
       Ast.Type.pp t1 Ast.Type.pp t2
   in Error_msg.mk pos msg
 
-let exp_tuple_pat pos ty _ =
-  let msg =
-    Format.asprintf
-      "This pattern matches values of a tuple type but a pattern was expected which matches values of type %a"
-      Ast.Type.pp ty
-  in Error_msg.mk pos msg
-
-let exp_diff_tuple_pat pos ty _ =
-  let msg =
-    Format.asprintf
-      "This pattern matches values of a tuple type but a pattern was expected which matches values of a different tuple type %a"
-      Ast.Type.pp ty
-  in Error_msg.mk pos msg
-
-let bound_several_times pos x _ _ =
+let bound_several_times pos x =
   let msg =
     Format.asprintf
       "Variable %s is bound several times in this matching"
@@ -182,7 +158,7 @@ let ty_param_several_times pos =
 
 type ty_scheme = string list * ty
 type ctxt = ty_scheme Env.t
-type constr = ty * ty * (ty -> ty -> Error_msg.t)
+type constr = ty * ty
 
 let fresh () = TParam (_gensym ())
 
@@ -194,13 +170,13 @@ let rec nub l =
   | [] -> []
   | x :: xs -> x :: List.filter ((<>) x) (nub xs)
 
-let free_vars =
+let free_vars ty =
   let rec go = function
     | TTuple ts | TAdt (ts, _) -> List.concat_map go ts
     | TFun (t1, t2) -> go t1 @ go t2
     | TParam a -> [a]
     | _ -> []
-  in go
+  in nub (go ty)
 
 let well_typed (p : stmt list) : (unit, Error_msg.t) result =
   let rec go (used_ty_names : string list) (ctxt : ctxt) p =
@@ -240,7 +216,15 @@ let well_typed (p : stmt list) : (unit, Error_msg.t) result =
           | Ok ctxt -> go (name :: used_ty_names) ctxt ps
           | Error e-> Error e
       else Error (ty_param_several_times pos)
-  in go [] Env.empty p
+  in
+  let ctxt =
+    Env.(
+      empty
+      |> add "print_endline" ([], TFun (TString, TUnit))
+      |> add "Nil" (["a"], TAdt ([TParam "a"], "list"))
+      |> add "Cons" (["a"], TFun (TTuple [TParam "a"; TAdt ([TParam "a"], "list")], TAdt ([TParam "a"], "list")))
+    )
+  in go [] ctxt p
 
 (* EVALUATION
    ----------------------------------------------------------------------
@@ -280,7 +264,20 @@ let eval (p : stmt list) : value =
       let v = eval_expr env e in
       go (Env.add name v env) (Some v) ps
     | _ :: ps -> go env v ps
-  in go Env.empty None p
+  in
+  let env =
+    Env.(
+      empty
+      |> add "print_endline"
+        (VClos
+           {
+             env = empty;
+             name = None;
+             arg = "$print_endline";
+             body = Ast.Expr.mk dummy_pos Unit;
+           })
+    )
+  in go env None p
 
 
 (* INTERPRETER

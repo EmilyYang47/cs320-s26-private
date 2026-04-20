@@ -26,7 +26,7 @@ module Type = struct
     | TBool -> pf ppf "bool"
     | TInt -> pf ppf "int"
     | TString -> pf ppf "string"
-    | TParam a -> string ppf a
+    | TParam a -> pf ppf "'%s" a
     | TFun (t1, t2) -> pf ppf "%a -> %a" pp_parens t1 pp t2
     | TTuple ts -> list ~sep:(Fmt.any " * ") pp ppf ts
     | TAdt ([], n) -> pf ppf "%s" n
