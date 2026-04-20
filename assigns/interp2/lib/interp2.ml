@@ -433,7 +433,7 @@ let eval_expr (env : dyn_env) (e : expr) : value =
                                     in
                                     loop env3 e
                             | _ -> assert false)  *)
-    | App (e1, e_args) -> 
+    (* | App (e1, e_args) -> 
                     let v1 = loop environment e1 in 
                     let v_args = List.map (loop environment) e_args in 
                     (match v1 with
@@ -458,7 +458,35 @@ let eval_expr (env : dyn_env) (e : expr) : value =
                             | None   -> env3
                           in
                           loop env3 e
-                    | _ -> assert false)
+                    | _ -> assert false) *)
+    | App (e1, e_args) -> 
+                let v1 = loop environment e1 in 
+                let v_args = List.map (loop environment) e_args in 
+                let rec apply_closure v vals =
+                  match v, vals with
+                  | _, [] -> v
+                  | VClos {env = env2; name; args; body = e}, _ ->
+                      let n_args = List.length args in
+                      let n_vals = List.length vals in
+                      if n_vals < n_args then
+                        (* partial application *)
+                        let applied = List.filteri (fun i _ -> i < n_vals) args in
+                        let remaining = List.filteri (fun i _ -> i >= n_vals) args in
+                        let env3 = List.fold_left2 (fun env a v -> Env.add a v env) env2 applied vals in
+                        VClos {env = env3; name; args = remaining; body = e}
+                      else
+                        (* full or over-application *)
+                        let this_vals = List.filteri (fun i _ -> i < n_args) vals in
+                        let rest_vals = List.filteri (fun i _ -> i >= n_args) vals in
+                        let env3 = List.fold_left2 (fun env a v -> Env.add a v env) env2 args this_vals in
+                        let env3 = match name with
+                          | Some n -> Env.add n v env3
+                          | None -> env3
+                        in
+                        apply_closure (loop env3 e) rest_vals
+                  | _ -> assert false
+                in
+                apply_closure v1 v_args
     | Bop (bop, e1, e2) -> (match bop with
                             | And -> (match loop environment e1 with
                                       | VBool false -> VBool false

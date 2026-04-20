@@ -444,6 +444,43 @@ let type_of_tests =
     (fun _ -> t (Ok TInt)
         "let x = 1 in let y = x + 1 in let z = y + 1 in z");
 
+
+        (* ── Additional Well-Typed Cases ── *)
+
+    "curried_fun_type" >:: 
+    (fun _ -> t (Ok (TFun (TInt, TFun (TInt, TInt))))
+        "fun (x : int) -> fun (y : int) -> x + y");
+
+    "curried_app_type" >:: 
+    (fun _ -> t (Ok TInt)
+        "(fun (x : int) -> fun (y : int) -> x + y) 1 2");
+
+    "partial_application_type" >:: 
+    (fun _ -> t (Ok (TFun (TInt, TInt)))
+        "let add (x : int) (y : int) = x + y in add 1");
+
+    "higher_order_function_type" >:: 
+    (fun _ -> t (Ok TInt)
+        "let apply (f : int -> int) (x : int) = f x in apply (fun (z:int) -> z * 2) 3");
+
+    "list_recursion_type" >:: 
+    (fun _ -> t (Ok TInt)
+        "let rec sum (x : int list) : int =
+           match x with
+           | [] -> 0
+           | h :: t -> h + sum t
+         in sum (1 :: 2 :: 3 :: [])");
+
+    "tuple_pattern_match_type" >:: 
+    (fun _ -> t (Ok TInt)
+        "match (1,2,3) with | (_,y,_) -> y");
+
+    "nested_let_function_type" >:: 
+    (fun _ -> t (Ok TInt)
+        "let f (x:int) = x + 1 in let g = f in g 1");
+
+
+      
   ]
 
 
@@ -734,6 +771,36 @@ let eval_tests =
     "assert_in_let" >::
     (fun _ -> t (VInt 1)
         "let x = 5 in let _ = assert (x > 0) in 1");
+
+            (* ── Additional Evaluation Cases ── *)
+
+    "curried_fun_eval" >:: 
+    (fun _ -> t (VInt 3)
+        "(fun (x : int) -> fun (y : int) -> x + y) 1 2");
+
+    "partial_application_eval" >:: 
+    (fun _ -> t (VInt 5)
+        "let add (x : int) (y : int) = x + y in let add2 = add 2 in add2 3");
+
+    "higher_order_eval" >:: 
+    (fun _ -> t (VInt 6)
+        "let apply (f : int -> int) (x : int) = f x in apply (fun (z:int) -> z * 2) 3");
+
+    "list_sum_eval" >:: 
+    (fun _ -> t (VInt 6)
+        "let rec sum (x : int list) : int =
+           match x with
+           | [] -> 0
+           | h :: t -> h + sum t
+         in sum (1 :: 2 :: 3 :: [])");
+
+    "tuple_match_eval" >:: 
+    (fun _ -> t (VInt 2)
+        "match (1,2,3) with | (_,y,_) -> y");
+
+    "nested_let_eval" >:: 
+    (fun _ -> t (VInt 2)
+        "let f (x:int) = x + 1 in let g = f in g 1");
 
   ]
 
