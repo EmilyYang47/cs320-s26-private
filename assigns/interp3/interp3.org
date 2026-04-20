@@ -15,7 +15,10 @@ To verify you're making progress, you're required to submit part of
 the mini-project by *Thursday 4/23 by 8PM*.  For this check-in (for 50%
 of the total grade) you need to complete:
 
-+ (30%) the function ~eval_expr~ in its entirety;
++ +(30%) the function ~eval_expr~ in its entirety;+ Though it's still
+  recommended that you complete this by the one-week check-in, it's
+  not required. Everything will be tested by the *Mini-Project 3*
+  autograder.
 + (20%) the written problem below.
 
 * Written Problems
