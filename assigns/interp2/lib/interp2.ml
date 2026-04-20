@@ -1,5 +1,6 @@
 open Utils
 module Error_msg = Error_msg
+(* I used gen-ai to help me debugging in this project *)
 
 (* SYNTAX
    ----------------------------------------------------------------------
@@ -218,45 +219,42 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty, Error_msg.t) result =
                           | Ok (t) -> let out_ty = List.fold_right (fun (_, tk) acc -> TFun (tk, acc)) args t in Ok (out_ty)
                           | Error e -> Error e
                           ) 
-    | App (e, e_args) ->
-                        (match loop context e with
+    | App (e, e_args) -> (match loop context e with
                         | Error err -> Error err
-                        | Ok e_out ->
-                            let rec check_arg_type ty args =
-                              match ty, args with
-                              | t, [] -> Ok t
-                              | TFun (t_in, t_out), x :: xs ->
-                                  (match loop context x with
-                                    | Error err -> Error err
-                                    | Ok t_arg ->
-                                        if t_arg = t_in then check_arg_type t_out xs
-                                        else Error (exp_ty x.pos t_arg t_in))
-                              | t, x :: _ -> Error (too_many_args x.pos t)
-                            in
-                            (match e_out with
-                              | TFun _ -> check_arg_type e_out e_args
-                              | t -> if e_args = [] then Ok t else Error (not_func e.pos t)))
+                        | Ok e_out -> let rec check_arg_type ty args =
+                                        match ty, args with
+                                        | t, [] -> Ok t
+                                        | TFun (t_in, t_out), x :: xs ->
+                                                    (match loop context x with
+                                                      | Error err -> Error err
+                                                      | Ok t_arg ->
+                                                          if t_arg = t_in then check_arg_type t_out xs
+                                                          else Error (exp_ty x.pos t_arg t_in))
+                                        | t, x :: _ -> Error (too_many_args x.pos t)
+                                      in
+                                      (match e_out with
+                                        | TFun _ -> check_arg_type e_out e_args
+                                        | t -> if e_args = [] then Ok t else Error (not_func e.pos t)))
     | Bop (bop, e1, e2) -> (match loop context e1, loop context e2 with
                             | Error e, _ -> Error e
                             | _, Error e -> Error e
-                            | Ok t1, Ok t2 ->
-                                            (match bop, t1, t2 with
-                                            | (Add | Sub | Mul | Div | Mod), TInt, TInt -> Ok TInt
-                                            | (Lt | Lte | Gt | Gte | Eq | Neq), TInt, TInt -> Ok TBool
-                                            | (And | Or), TBool, TBool -> Ok TBool
-                                            | (Eq | Neq), TBool, TBool -> Ok TBool
-                                            | Cons, TInt, TInt_list -> Ok TInt_list
-                                            | (Add | Sub | Mul | Div | Mod), t, TInt -> Error (exp_ty e1.pos t TInt)
-                                            | (Add | Sub | Mul | Div | Mod), TInt, t -> Error (exp_ty e2.pos t TInt)
-                                            | (Add | Sub | Mul | Div | Mod), t, _ -> Error (exp_ty e1.pos t TInt)
-                                            | (And | Or), t, TBool -> Error (exp_ty e1.pos t TBool)
-                                            | (And | Or), TBool, t -> Error (exp_ty e2.pos t TBool)
-                                            | (And | Or), t, _ -> Error (exp_ty e1.pos t TBool)
-                                            | Cons, TInt, t -> Error (exp_ty e2.pos t TInt_list)
-                                            | Cons, t, _ -> Error (exp_ty e1.pos t TInt)
-                                            | (Lt | Lte | Gt | Gte | Eq | Neq), t1, t2 -> if t1 = t2 then Ok TBool else Error (exp_ty e2.pos t2 t1)
-                                            )
-                            )  
+                            | Ok t1, Ok t2 -> (match bop, t1, t2 with
+                                              | (Add | Sub | Mul | Div | Mod), TInt, TInt -> Ok TInt
+                                              | (Lt | Lte | Gt | Gte | Eq | Neq), TInt, TInt -> Ok TBool
+                                              | (And | Or), TBool, TBool -> Ok TBool
+                                              | (Eq | Neq), TBool, TBool -> Ok TBool
+                                              | Cons, TInt, TInt_list -> Ok TInt_list
+                                              | (Add | Sub | Mul | Div | Mod), t, TInt -> Error (exp_ty e1.pos t TInt)
+                                              | (Add | Sub | Mul | Div | Mod), TInt, t -> Error (exp_ty e2.pos t TInt)
+                                              | (Add | Sub | Mul | Div | Mod), t, _ -> Error (exp_ty e1.pos t TInt)
+                                              | (And | Or), t, TBool -> Error (exp_ty e1.pos t TBool)
+                                              | (And | Or), TBool, t -> Error (exp_ty e2.pos t TBool)
+                                              | (And | Or), t, _ -> Error (exp_ty e1.pos t TBool)
+                                              | Cons, TInt, t -> Error (exp_ty e2.pos t TInt_list)
+                                              | Cons, t, _ -> Error (exp_ty e1.pos t TInt)
+                                              | (Lt | Lte | Gt | Gte | Eq | Neq), t1, t2 -> if t1 = t2 then Ok TBool else Error (exp_ty e2.pos t2 t1)
+                                              )
+                            ) (* I used gen-ai to help me clean and restructure this part so that the code is not too loooooong or contain too many duplicated parts *)
     | Negate (e) -> (match loop context e with 
                     | Ok (TInt) -> Ok (TInt) 
                     | Ok t -> Error (exp_ty e.pos t TInt) 
@@ -267,76 +265,73 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty, Error_msg.t) result =
                     | Ok t -> Error (exp_ty e.pos t TBool)  
                     | Error e -> Error e 
                     ) 
-    | Tuple e_list ->
-        let rec out_ty rest = 
-          match rest with
-          | [] -> Ok []
-          | e :: es -> (match loop context e with
-                        | Ok t -> (match out_ty es with
-                                    | Ok ts -> Ok (t :: ts)
-                                    | Error e -> Error e
-                                    )
-                        | Error e -> Error e
-                        )
-        in
-        (match out_ty e_list with
-         | Ok t_list -> Ok (TTuple t_list)
-         | Error e -> Error e)
-    | Match (e, branches) ->
-        (match loop context e with
-        | Error err -> Error err
-        | Ok t_scrut ->
-              let rec bind_pattern (context : ctxt) (pat : pattern) (t : ty) (pos : pos) (bound : string list) : (ctxt * string list, Error_msg.t) result =
-                match pat.pattern, t with
-                | PUnit, TUnit -> Ok (context, bound)
-                | PBool _, TBool -> Ok (context, bound)
-                | PInt _, TInt -> Ok (context, bound)
-                | PNil, TInt_list -> Ok (context, bound)
-                | PVar "_", t -> Ok (Env.add "_" t context, bound)  (* wildcard: skip dup check *)
-                | PVar x, t ->
-                    if List.mem x bound
-                    then Error (bound_several_times pat.pos x)
-                    else Ok (Env.add x t context, x :: bound)
-                | PCons (p_head, p_tail), TInt_list ->
-                    (match bind_pattern context p_head TInt pos bound with
-                    | Error err -> Error err
-                    | Ok (ctx, bound') -> bind_pattern ctx p_tail TInt_list pos bound')
-                | PTuple ps, TTuple ts ->
-                    if List.length ps <> List.length ts
-                    then Error (exp_diff_tuple_pat pat.pos t)
-                    else List.fold_left2
-                          (fun acc p ti ->
-                            match acc with
+    | Tuple e_list -> let rec out_ty rest = 
+                        match rest with
+                        | [] -> Ok []
+                        | e :: es -> (match loop context e with
+                                      | Ok t -> (match out_ty es with
+                                                  | Ok ts -> Ok (t :: ts)
+                                                  | Error e -> Error e
+                                                  )
+                                      | Error e -> Error e
+                                      )
+                      in
+                      (match out_ty e_list with
+                      | Ok t_list -> Ok (TTuple t_list)
+                      | Error e -> Error e)
+    | Match (e, branches) -> (match loop context e with
                             | Error err -> Error err
-                            | Ok (ctx, bound') -> bind_pattern ctx p ti pos bound')
-                          (Ok (context, bound)) ps ts
-                | PTuple _, t -> Error (exp_tuple_pat pat.pos t)
-                | PCons _, t -> Error (exp_pat pat.pos TInt_list t)
-                | PUnit, t -> Error (exp_pat pat.pos TUnit t)
-                | PBool _, t -> Error (exp_pat pat.pos TBool t)
-                | PInt _, t -> Error (exp_pat pat.pos TInt t)
-                | PNil, t -> Error (exp_pat pat.pos TInt_list t)
-            in
-            let rec check_branches = function
-              | [] -> assert false
-              | [(pat, body)] ->
-                  (match bind_pattern context pat t_scrut exp.pos [] with
-                  | Error err -> Error err
-                  | Ok (pat_ctxt, _) -> loop pat_ctxt body)
-              | (pat, body) :: rest ->
-                  (match bind_pattern context pat t_scrut exp.pos [] with
-                  | Error err -> Error err
-                  | Ok (pat_ctxt, _) ->
-                      (match loop pat_ctxt body with
-                      | Error err -> Error err
-                      | Ok t_branch ->
-                          (match check_branches rest with
-                          | Error err -> Error err
-                          | Ok t_rest ->
-                              if t_branch = t_rest then Ok t_branch
-                              else Error (exp_ty body.pos t_branch t_rest))))
-            in
-            check_branches branches)
+                            | Ok scrut_ty ->
+                                  let rec bind_pattern (context : ctxt) (p : pattern) (t : ty) (pos : pos) (bound : string list) : (ctxt * string list, Error_msg.t) result =
+                                    match p.pattern, t with
+                                    | PUnit, TUnit -> Ok (context, bound)
+                                    | PBool _, TBool -> Ok (context, bound)
+                                    | PInt _, TInt -> Ok (context, bound)
+                                    | PNil, TInt_list -> Ok (context, bound)
+                                    | PVar "_", t -> Ok (Env.add "_" t context, bound)  
+                                    | PVar x, t -> if List.mem x bound
+                                                    then Error (bound_several_times p.pos x)
+                                                    else Ok (Env.add x t context, x :: bound)
+                                    | PCons (p_head, p_tail), TInt_list ->
+                                                    (match bind_pattern context p_head TInt pos bound with
+                                                    | Error err -> Error err
+                                                    | Ok (ctx, bound') -> bind_pattern ctx p_tail TInt_list pos bound')
+                                    | PTuple ps, TTuple ts -> if List.length ps <> List.length ts
+                                                              then Error (exp_diff_tuple_pat p.pos t)
+                                                              else List.fold_left2
+                                                                    (fun acc p ti ->
+                                                                      match acc with
+                                                                      | Error err -> Error err
+                                                                      | Ok (ctx, bound') -> bind_pattern ctx p ti pos bound')
+                                                                    (Ok (context, bound)) ps ts
+                                    | PTuple _, t -> Error (exp_tuple_pat p.pos t)
+                                    | PCons _, t -> Error (exp_pat p.pos TInt_list t)
+                                    | PUnit, t -> Error (exp_pat p.pos TUnit t)
+                                    | PBool _, t -> Error (exp_pat p.pos TBool t)
+                                    | PInt _, t -> Error (exp_pat p.pos TInt t)
+                                    | PNil, t -> Error (exp_pat p.pos TInt_list t)
+                                in
+                                let rec check_branches branches = 
+                                  match branches with 
+                                  | [] -> assert false
+                                  | [(p, body)] ->
+                                      (match bind_pattern context p scrut_ty exp.pos [] with
+                                      | Error err -> Error err
+                                      | Ok (p_ctxt, _) -> loop p_ctxt body)
+                                  | (p, body) :: rest ->
+                                      (match bind_pattern context p scrut_ty exp.pos [] with
+                                      | Error err -> Error err
+                                      | Ok (p_ctxt, _) ->
+                                          (match loop p_ctxt body with
+                                          | Error err -> Error err
+                                          | Ok t_branch ->
+                                              (match check_branches rest with
+                                              | Error err -> Error err
+                                              | Ok t_rest ->
+                                                  if t_branch = t_rest then Ok t_branch
+                                                  else Error (exp_ty body.pos t_branch t_rest))))
+                                in
+                                check_branches branches)
   in loop ctxt e 
 
 let type_of (p : prog) : (ty, Error_msg.t) result =
@@ -433,32 +428,55 @@ let eval_expr (env : dyn_env) (e : expr) : value =
                                     in
                                     loop env3 e
                             | _ -> assert false)  *)
-    | App (e1, e_args) -> 
-                    let v1 = loop environment e1 in 
-                    let v_args = List.map (loop environment) e_args in 
-                    (match v1 with
-                    | VClos {env = env2; name; args; body = e} ->
-                        let rec get_env3 env args vals = 
-                          match args, vals with 
-                          | [], [] -> env
-                          | ar :: ars, v :: vs -> get_env3 (Env.add ar v env) ars vs
-                          | _ -> assert false
-                        in
-                        let n_args = List.length args in
-                        let n_vals = List.length v_args in
-                        if n_vals < n_args then
-                          let applied = List.filteri (fun i _ -> i < n_vals) args in
-                          let remaining = List.filteri (fun i _ -> i >= n_vals) args in
-                          let env3 = List.fold_left2 (fun env a v -> Env.add a v env) env2 applied v_args in
-                          VClos {env = env3; name; args = remaining; body = e}
-                        else
-                          let env3 = get_env3 env2 args v_args in
-                          let env3 = match name with
-                            | Some n -> Env.add n v1 env3
-                            | None   -> env3
+    (* | App (e1, e_args) -> let v1 = loop environment e1 in 
+                          let v_args = List.map (loop environment) e_args in 
+                          (match v1 with
+                          | VClos {env = env2; name; args; body = e} -> let rec get_env3 env args vals = 
+                                                                          match args, vals with 
+                                                                          | [], [] -> env
+                                                                          | ar :: ars, v :: vs -> get_env3 (Env.add ar v env) ars vs
+                                                                          | _ -> assert false
+                                                                        in
+                                                                        let n_args = List.length args in
+                                                                        let n_vals = List.length v_args in
+                                                                        if n_vals < n_args then
+                                                                          let applied = List.filteri (fun i _ -> i < n_vals) args in
+                                                                          let remaining = List.filteri (fun i _ -> i >= n_vals) args in
+                                                                          let env3 = List.fold_left2 (fun env a v -> Env.add a v env) env2 applied v_args in
+                                                                          VClos {env = env3; name; args = remaining; body = e}
+                                                                        else
+                                                                          let env3 = get_env3 env2 args v_args in
+                                                                          let env3 = match name with
+                                                                            | Some n -> Env.add n v1 env3
+                                                                            | None   -> env3
+                                                                          in
+                                                                          loop env3 e
+                          | _ -> assert false) *)
+    | App (e1, e_args) -> let v1 = loop environment e1 in 
+                          let v_args = List.map (loop environment) e_args in
+                          let rec apply v vals =
+                            match v, vals with
+                            | _, [] -> v
+                            | VClos {env = env2; name; args; body = e}, _ ->
+                                let n_args = List.length args in
+                                let n_vals = List.length vals in
+                                if n_vals < n_args then
+                                  let applied  = List.filteri (fun i _ -> i < n_vals) args in
+                                  let remaining = List.filteri (fun i _ -> i >= n_vals) args in
+                                  let env3 = List.fold_left2 (fun acc a v -> Env.add a v acc) env2 applied vals in
+                                  VClos {env = env3; name; args = remaining; body = e}
+                                else
+                                  let this_vals = List.filteri (fun i _ -> i < n_args) vals in
+                                  let rest_vals = List.filteri (fun i _ -> i >= n_args) vals in
+                                  let env3 = List.fold_left2 (fun acc a v -> Env.add a v acc) env2 args this_vals in
+                                  let env3 = match name with
+                                    | Some n -> Env.add n v env3
+                                    | None   -> env3
+                                  in
+                                  apply (loop env3 e) rest_vals
+                            | _ -> assert false
                           in
-                          loop env3 e
-                    | _ -> assert false)
+                          apply v1 v_args
     | Bop (bop, e1, e2) -> (match bop with
                             | And -> (match loop environment e1 with
                                       | VBool false -> VBool false
@@ -520,38 +538,37 @@ let eval_expr (env : dyn_env) (e : expr) : value =
                     | _ -> assert false  
                     ) 
     | Tuple e_list -> VTuple (List.map (loop environment) e_list)
-    | Match (e, branches) ->
-                    let rec bind_pat (env : dyn_env) (pat : pattern) (v : value) : dyn_env option =
-                      match pat.pattern, v with
-                      | PUnit, VUnit -> Some env
-                      | PBool b1, VBool b2 -> if b1 = b2 then Some env else None
-                      | PInt n1, VInt n2 -> if n1 = n2 then Some env else None
-                      | PNil, VInt_list [] -> Some env
-                      | PVar "_", _ -> Some env  (* wildcard: match anything, don't bind *)
-                      | PVar x, v -> Some (Env.add x v env)
-                      | PCons (p_head, p_tail), VInt_list (x :: xs) ->
-                          (match bind_pat env p_head (VInt x) with
-                          | None -> None
-                          | Some env' -> bind_pat env' p_tail (VInt_list xs))
-                      | PTuple ps, VTuple vs ->
-                          if List.length ps <> List.length vs then None
-                          else List.fold_left2
-                                (fun acc p v ->
-                                  match acc with
-                                  | None -> None
-                                  | Some env' -> bind_pat env' p v)
-                                (Some env) ps vs
-                      | _ -> None
-                    in
-                    let v_scrut = loop environment e in
-                    let rec try_branches = function
-                      | [] -> raise (Match_fail exp.pos)
-                      | (pat, body) :: rest ->
-                          (match bind_pat environment pat v_scrut with
-                          | None -> try_branches rest
-                          | Some env' -> loop env' body)
-                    in
-                    try_branches branches
+    | Match (e, branches) -> let rec bind_pattern (env : dyn_env) (p : pattern) (v : value) : dyn_env option =
+                                match p.pattern, v with
+                                | PUnit, VUnit -> Some env
+                                | PBool b1, VBool b2 -> if b1 = b2 then Some env else None
+                                | PInt n1, VInt n2 -> if n1 = n2 then Some env else None
+                                | PNil, VInt_list [] -> Some env
+                                | PVar "_", _ -> Some env  
+                                | PVar x, v -> Some (Env.add x v env)
+                                | PCons (p_head, p_tail), VInt_list (x :: xs) ->
+                                    (match bind_pattern env p_head (VInt x) with
+                                    | None -> None
+                                    | Some env' -> bind_pattern env' p_tail (VInt_list xs))
+                                | PTuple ps, VTuple vs ->
+                                    if List.length ps <> List.length vs then None
+                                    else List.fold_left2
+                                          (fun acc p v ->
+                                            match acc with
+                                            | None -> None
+                                            | Some env' -> bind_pattern env' p v)
+                                          (Some env) ps vs
+                                | _ -> None
+                              in
+                              let v_scrut = loop environment e in
+                              let rec check_branches = function
+                                | [] -> raise (Match_fail exp.pos)
+                                | (p, body) :: rest ->
+                                    (match bind_pattern environment p v_scrut with
+                                    | None -> check_branches rest
+                                    | Some env' -> loop env' body)
+                              in
+                              check_branches branches
   in loop env e 
 
 let eval (p : prog) : value =
