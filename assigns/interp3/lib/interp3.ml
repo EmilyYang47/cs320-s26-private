@@ -353,8 +353,44 @@ let eval_expr (env : dyn_env) (e : Ast.Expr.t) : value =
                                                               loop (Env.add x v1 environment) e2)
                                                         else let v1 = loop environment e1 in 
                                                               loop (Env.add x v1 environment) e2  
-    | Match (_, _) -> assert false 
-  in loop env e
+    | Match (e, branches) -> let rec match_patterns (env : dyn_env) (p : pattern) (v : value) : dyn_env option = 
+                                match p.pattern, v with 
+                                | PWild, _ -> Some env 
+                                | PVar x, v -> Some (Env.add x v env) 
+                                | PUnit, VUnit -> Some env 
+                                | PBool b1, VBool b2 -> if b1 = b2 then Some env else None  
+                                | PInt n1, VInt n2 -> if n1 = n2 then Some env else None 
+                                | PString s1, VString s2 -> if s1 = s2 then Some env else None 
+                                | PTuple ps, VTuple vs ->
+                                    if List.length ps <> List.length vs then None 
+                                    else let rec make_envr acc ps vs =
+                                      match ps, vs with
+                                      | [], [] -> Some acc
+                                      | p :: ps, v :: vs ->
+                                        (match match_patterns acc p v with
+                                        | None -> None
+                                        | Some envr -> make_envr envr ps vs)
+                                      | _ -> None
+                                    in make_envr env ps vs 
+                                | PCons (x, p), VCons (vx, v) -> 
+                                  if x <> vx then None 
+                                  else (match p, v with 
+                                        | None, None -> Some env  
+                                        | Some p1, Some v2 -> match_patterns env p1 v2 
+                                        | _ -> None 
+                                        ) 
+                                | _ -> None 
+                              in let v = loop environment e in 
+                              let rec check_branches branches = 
+                                match branches with 
+                                | [] -> raise (Match_fail exp.pos) 
+                                | (p, body) :: rest -> 
+                                    (match match_patterns environment p v with 
+                                    | None -> check_branches rest 
+                                    | Some envr -> loop envr body
+                                    ) 
+                              in check_branches branches 
+    in loop env e
 
 let eval (p : stmt list) : value =
   let rec go env v p =
