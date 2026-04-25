@@ -252,7 +252,108 @@ exception Match_fail of pos
 exception Compare_fun_val of pos
 
 let eval_expr (env : dyn_env) (e : Ast.Expr.t) : value =
-  ignore (env, e); assert false
+  let rec loop (environment : dyn_env) (exp : expr) = 
+    match exp.expr with 
+    | Unit  -> VUnit  
+    | Bool b -> VBool b 
+    | Int n -> VInt n 
+    | String s -> VString s 
+    | Negate e -> (match loop environment e with 
+                    | VInt (v1) -> VInt (- v1) 
+                    | _ -> assert false  
+                    ) 
+    | Var x -> Env.find x environment
+    | Bop (bop, e1, e2) -> (match bop with
+                            | And -> (match loop environment e1 with
+                                      | VBool false -> VBool false
+                                      | VBool true  -> loop environment e2
+                                      | _ -> assert false)
+                            | Or  -> (match loop environment e1 with
+                                      | VBool true  -> VBool true
+                                      | VBool false -> loop environment e2
+                                      | _ -> assert false)
+                            | _ -> 
+                          (match loop environment e1, loop environment e2 with
+                            | VInt (v1), VInt (v2) ->
+                                (match bop with
+                                  | Add -> VInt (v1 + v2)
+                                  | Sub -> VInt (v1 - v2)
+                                  | Mul -> VInt (v1 * v2)
+                                  | Div -> if v2 = 0 then raise Div_by_zero else VInt (v1 / v2) 
+                                  | Mod -> if v2 = 0 then raise Div_by_zero else VInt (v1 mod v2) 
+                                  | Lt  -> VBool (v1 < v2)
+                                  | Lte -> VBool (v1 <= v2)
+                                  | Gt  -> VBool (v1 > v2)
+                                  | Gte -> VBool (v1 >= v2)
+                                  | Eq  -> VBool (v1 = v2)
+                                  | Neq -> VBool (v1 <> v2) 
+                                  | _ -> assert false) 
+                            | VBool (v1), VBool (v2) ->
+                                (match bop with
+                                  | Eq  -> VBool (v1 = v2)
+                                  | Neq -> VBool (v1 <> v2)
+                                  | Lt  -> VBool (v1 < v2)
+                                  | Lte -> VBool (v1 <= v2)
+                                  | Gt  -> VBool (v1 > v2)
+                                  | Gte -> VBool (v1 >= v2)
+                                  (* | And -> if v1 then VBool(v2) else VBool(v1)
+                                  | Or  -> if v1 then VBool(v1) else VBool(v2) *)
+                                  | _ -> assert false
+                                )
+                            | VString v1, VString v2 ->
+                                  (match bop with
+                                    | Contact -> VString (v1 ^ vs)
+                                    | _ -> assert false)
+                            | v1, v2 -> 
+                                  (match bop with 
+                                  | Eq  -> VBool (v1 = v2) 
+                                  | Neq -> VBool (v1 <> v2) 
+                                  | Lt -> VBool (v1 < v2)
+                                  | Lte -> VBool (v1 <= v2)
+                                  | Gt -> VBool (v1 > v2)
+                                  | Gte -> VBool (v1 >= v2)
+                                  | _ -> assert false) 
+                            )  ) 
+    | If (e1, e2, e3) -> (match loop environment e1 with
+                          | VBool true  -> loop environment e2
+                          | VBool false -> loop environment e3
+                          | _ -> assert false 
+                          )      
+    | Annot (e, t) -> loop environment e 
+    | Assert e -> (match loop environment e with 
+                    | VBool (true)  -> VUnit
+                    | VBool (false) -> raise Assert_fail
+                    | _ -> assert false  
+                    ) 
+    | Tuple e_list -> VTuple (List.map (loop environment) e_list) 
+    | Cons (name, e_option) -> (match e_option with 
+                              | None -> VCons (name, None) 
+                              | Some e -> VCons (name, Some (loop environment e)) 
+                              ) 
+    | Fun ((arg, _), e) -> VClos {env = environment; name = None; arg=arg; body=e} 
+    
+    | App (e1, e2) -> let v1 = loop environment e1 in
+                      let v2 = loop environment e2 in
+                      (match v1 with
+                      | VClos {env = env2; name; arg = x; body} ->
+                          let env3 = Env.add x v2 env2 in
+                          let env3 = match name with
+                            | Some n -> Env.add n (Vclos {env = env2; name; arg=x; body}) env3
+                            | None   -> env3
+                          in
+                          loop env3 body
+                      | _ -> assert false) 
+    | Let {is_rec; name = x; binding = e1; body = 2} -> if is_rec then 
+                                                            (match e1.expr with
+                                                            | Fun ((arg, _), e) ->
+                                                              let env2 = Env.add x (VClos { environment; name = Some x; arg; body = e }) environment in
+                                                              loop env2 e2
+                                                            | _ ->
+                                                              let v1 = loop environment e1 in
+                                                              loop (Env.add x v1 environment) e2)
+                                                        else let v1 = loop environment e1 in 
+                                                              loop (Env.add x v1 environment) e2  
+    | Match (e, branches) -> assert false 
 
 let eval (p : stmt list) : value =
   let rec go env v p =
