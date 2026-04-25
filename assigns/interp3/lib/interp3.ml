@@ -160,15 +160,28 @@ type ty_scheme = string list * ty
 type ctxt = ty_scheme Env.t
 type constr = ty * ty
 
-let fresh () = TParam (_gensym ())
+let fresh () = TParam (_gensym ()) 
+
+let rec nub l =
+  match l with
+  | [] -> []
+  | x :: xs -> x :: List.filter ((<>) x) (nub xs) 
+
+let free_vars ty =
+  let rec go = function
+    | TTuple ts | TAdt (ts, _) -> List.concat_map go ts
+    | TFun (t1, t2) -> go t1 @ go t2
+    | TParam a -> [a]
+    | _ -> []
+  in nub (go ty)
 
 let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
   let rec loop (context : ctxt) (exp : expr) : (ty * constr list, Error_msg.t) result = 
     match exp.expr with 
     | Unit  -> Ok (TUnit, [])  
-    | Bool b -> Ok (TBool, [])  
-    | Int n -> Ok (TInt, []) 
-    | String s -> Ok (TString, [])  
+    | Bool _ -> Ok (TBool, [])  
+    | Int _ -> Ok (TInt, []) 
+    | String _ -> Ok (TString, [])  
     | Negate (e) -> (match loop context e with 
                     | Ok (ty, c) -> Ok (TInt, (ty, TInt) :: c) 
                     | Error e -> Error e
@@ -211,7 +224,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                                   | And | Or -> Ok (TBool, (t1, TBool) :: (t2, TBool) :: c1 @ c2 )  
                                   | Concat -> Ok (TString, (t1, TString) :: (t2, TString) :: c1 @ c2 )  
                                   | Eq | Neq | Lt | Lte | Gt | Gte -> Ok (TBool, (t1, t2) :: c1 @ c2 ) 
-                                  | _ -> assert false) 
+                                ) 
                           ) 
     | If (e1, e2, e3) -> (match loop context e1, loop context e2, loop context e3 with
                           | Ok (ty1, c1), Ok (ty2, c2), Ok (ty3, c3) -> Ok (ty2, (ty1, TBool) :: (ty3, ty2) :: c1 @ c2 @ c3) 
@@ -220,7 +233,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                           | _, _, Error e -> Error e 
                           )                  
     | Annot (e, t) -> (match loop context e with 
-                      | Ok (ty, c) -> Ok (t, [(ty, t)]) 
+                      | Ok (ty, _) -> Ok (t, [(ty, t)]) 
                       | Error e -> Error e  
                       ) 
     | Assert e -> (match loop context e with 
@@ -292,26 +305,85 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                                     | Some envr -> loop envr body
                                     ) 
                               in check_branches branches 
-    in loop env e *) 
-      | _ -> assert false 
-    in loop ctxt e 
+  in loop env e *) 
+    | _ -> assert false 
+  in 
+  let rec apply_subst (s : (string * ty) list) (t : ty) : ty =
+  match t with
+  | TParam a ->
+    (match List.assoc_opt a s with
+     | Some t' -> apply_subst s t'
+     | None    -> TParam a)
+  | TFun (t1, t2) -> TFun (apply_subst s t1, apply_subst s t2)
+  | TTuple ts     -> TTuple (List.map (apply_subst s) ts)
+  | TAdt (ts, n)  -> TAdt (List.map (apply_subst s) ts, n)
+  | t -> t 
+  in 
+  (* let unification (constraints : constr list) : (string * ty) list = 
+    let loop acc constrs = 
+      match constrs with 
+      | [] -> acc 
+      | (t1, t2) :: cs -> if t1 = t2 then loop acc cs 
+                          else (match (t1, t2) with 
+                                  | TFun (s1, t1), TFun (s2, t2) -> loop acc ((s1, s2) :: (t1, t2) :: cs) 
+                                  | TParam a, t | t, TParam a -> if not (List.mem a (free_vars t)) then 
+                                                                  let rest = List.map (fun (l, r) -> (apply_subst [(a, t)] l, apply_subst [(a, t)] r)) rest in
+                                                                  loop ((a, t) :: subst) rest 
+                                                                  else Error (exp_ty dummy_pos t1 t2)  
+                                  | _ -> Error (exp_ty dummy_pos t1 t2) 
+                          )
 
 
 
 
 
-let rec nub l =
-  match l with
-  | [] -> []
-  | x :: xs -> x :: List.filter ((<>) x) (nub xs)
+    in loop [] constraints  *) 
+  let unification (constraints : constr list) : ((string * ty) list, Error_msg.t) result =
+    let rec loop (subst : (string * ty) list) (cs : constr list) =
+      match cs with
+      | [] -> Ok subst
+      | (t1, t2) :: rest when t1 = t2 ->
+        loop subst rest
+      | (TFun (s1, t1), TFun (s2, t2)) :: rest ->
+        loop subst ((s1, s2) :: (t1, t2) :: rest)
+      | (TTuple ts1, TTuple ts2) :: rest when List.length ts1 = List.length ts2 ->
+        loop subst (List.combine ts1 ts2 @ rest)
+      | (TAdt (ts1, n1), TAdt (ts2, n2)) :: rest when n1 = n2 ->
+        loop subst (List.combine ts1 ts2 @ rest)
+      | (TParam a, t) :: rest
+        when not (List.mem a (free_vars t)) ->
+        let rest' = List.map (fun (l, r) ->
+          (apply_subst [(a, t)] l, apply_subst [(a, t)] r)) rest in
+        loop ((a, t) :: subst) rest'
+      | (t, TParam a) :: rest
+        when not (List.mem a (free_vars t)) ->
+        let rest' = List.map (fun (l, r) ->
+          (apply_subst [(a, t)] l, apply_subst [(a, t)] r)) rest in
+        loop ((a, t) :: subst) rest'
+      | (t1, t2) :: _ ->
+        Error (exp_ty dummy_pos t1 t2)
+    in
+    loop [] constraints
+  in 
+  match loop ctxt e with 
+  | Ok ((ty, constrs)) -> (match unification constrs with 
+                          | Ok (subst) -> let ty' = apply_subst subst ty in 
+                                          let fvs = free_vars ty' in 
+                                          Ok (fvs, ty') 
+                          | Error e -> Error e 
+                          ) 
+  | Error e -> Error e 
+      
+    
+    (* in loop ctxt e  *)
 
-let free_vars ty =
-  let rec go = function
-    | TTuple ts | TAdt (ts, _) -> List.concat_map go ts
-    | TFun (t1, t2) -> go t1 @ go t2
-    | TParam a -> [a]
-    | _ -> []
-  in nub (go ty)
+
+
+
+
+
+
+
 
 let well_typed (p : stmt list) : (unit, Error_msg.t) result =
   let rec go (used_ty_names : string list) (ctxt : ctxt) p =
