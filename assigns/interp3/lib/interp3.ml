@@ -303,6 +303,12 @@ let eval_expr (env : dyn_env) (e : Ast.Expr.t) : value =
                             | VString v1, VString v2 ->
                                   (match bop with
                                     | Concat -> VString (v1 ^ v2)
+                                    | Eq  -> VBool (v1 = v2) 
+                                    | Neq -> VBool (v1 <> v2) 
+                                    | Lt -> VBool (v1 < v2)
+                                    | Lte -> VBool (v1 <= v2)
+                                    | Gt -> VBool (v1 > v2)
+                                    | Gte -> VBool (v1 >= v2)
                                     | _ -> assert false)
                             | v1, v2 -> 
                                   (match bop with 
