@@ -163,7 +163,142 @@ type constr = ty * ty
 let fresh () = TParam (_gensym ())
 
 let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
-  ignore (ctxt, e); assert false
+  let rec loop (context : ctxt) (exp : expr) : (ty * constr list, Error_msg.t) result = 
+    match exp.expr with 
+    | Unit  -> Ok (TUnit, [])  
+    | Bool b -> Ok (TBool, [])  
+    | Int n -> Ok (TInt, []) 
+    | String s -> Ok (TString, [])  
+    | Negate (e) -> (match loop context e with 
+                    | Ok (ty, c) -> Ok (TInt, (ty, TInt) :: c) 
+                    | Error e -> Error e
+                    )
+    | Var x -> (match Env.find_opt x context with
+                | None -> Error (unknown_var exp.pos x)
+                | Some (alphas, ty) ->
+                  let betas = List.map (fun _ -> fresh ()) alphas in
+                  let rec zip acc als bs = 
+                    match als, bs with
+                    | [], [] -> acc
+                    | a::a_rest, b::b_rest -> (a, b) :: zip acc a_rest b_rest 
+                    | _ -> assert false 
+                  in 
+                  let rec lookup al lst =
+                    match lst with
+                    | [] -> None
+                    | (a, b) :: abs -> if a = al then Some (b) else lookup al abs
+                  in 
+                  let al_b_set = zip [] alphas betas in 
+                  let rec subs_a_with_b ty = 
+                    match ty with 
+                    | TParam a -> ( match lookup a al_b_set with
+                                    | Some b -> b
+                                    | None -> TParam a 
+                                  )
+                    | TFun (t1, t2) -> TFun (subs_a_with_b t1, subs_a_with_b t2)
+                    | TTuple ts     -> TTuple (List.map subs_a_with_b ts)
+                    | TAdt (ts, n)  -> TAdt (List.map subs_a_with_b ts, n)
+                    | t -> t
+                  in
+                  Ok (subs_a_with_b ty, [])) 
+
+    | Bop (bop, e1, e2) -> (match loop context e1, loop context e2 with 
+                            | Error e, _ -> Error e 
+                            | _, Error e -> Error e 
+                            | Ok (t1, c1), Ok (t2, c2) ->
+                                (match bop with
+                                  | Add | Sub | Mul | Div | Mod -> Ok (TInt, (t1, TInt) :: (t2, TInt) :: c1 @ c2 )  
+                                  | And | Or -> Ok (TBool, (t1, TBool) :: (t2, TBool) :: c1 @ c2 )  
+                                  | Concat -> Ok (TString, (t1, TString) :: (t2, TString) :: c1 @ c2 )  
+                                  | Eq | Neq | Lt | Lte | Gt | Gte -> Ok (TBool, (t1, t2) :: c1 @ c2 ) 
+                                  | _ -> assert false) 
+                          ) 
+    | If (e1, e2, e3) -> (match loop context e1, loop context e2, loop context e3 with
+                          | Ok (ty1, c1), Ok (ty2, c2), Ok (ty3, c3) -> Ok (ty2, (ty1, TBool) :: (ty3, ty2) :: c1 @ c2 @ c3) 
+                          | Error e, _, _ -> Error e 
+                          | _, Error e, _ -> Error e 
+                          | _, _, Error e -> Error e 
+                          )                  
+    | Annot (e, t) -> (match loop context e with 
+                      | Ok (ty, c) -> Ok (t, [(ty, t)]) 
+                      | Error e -> Error e  
+                      ) 
+    | Assert e -> (match loop context e with 
+                    | Ok (t, c) -> Ok (TUnit, (t, TBool) :: c) 
+                    | Error e -> Error e  
+                    ) 
+    (* | Tuple e_list -> VTuple (List.map (loop environment) e_list) 
+    | Cons (name, e_option) -> (match e_option with 
+                              | None -> VCons (name, None) 
+                              | Some e -> VCons (name, Some (loop environment e)) 
+                              ) 
+    | Fun ((arg, _), e) -> VClos {env = environment; name = None; arg=arg; body=e} 
+    
+    | App (e1, e2) -> let v1 = loop environment e1 in
+                      let v2 = loop environment e2 in
+                      (match v1 with
+                      | VClos {env = env2; name; arg = x; body} ->
+                          let env3 = Env.add x v2 env2 in
+                          let env3 = match name with
+                            | Some n -> Env.add n (VClos {env = env2; name; arg=x; body}) env3
+                            | None   -> env3
+                          in
+                          loop env3 body
+                      | _ -> assert false) 
+    | Let {is_rec; name = x; binding = e1; body = e2} -> if is_rec then 
+                                                            (match e1.expr with
+                                                            | Fun ((arg, _), e) ->
+                                                              let env2 = Env.add x (VClos { env=environment; name = Some x; arg; body = e }) environment in
+                                                              loop env2 e2
+                                                            | _ ->
+                                                              let v1 = loop environment e1 in
+                                                              loop (Env.add x v1 environment) e2)
+                                                        else let v1 = loop environment e1 in 
+                                                              loop (Env.add x v1 environment) e2  
+    | Match (e, branches) -> let rec match_patterns (env : dyn_env) (p : pattern) (v : value) : dyn_env option = 
+                                match p.pattern, v with 
+                                | PWild, _ -> Some env 
+                                | PVar x, v -> Some (Env.add x v env) 
+                                | PUnit, VUnit -> Some env 
+                                | PBool b1, VBool b2 -> if b1 = b2 then Some env else None  
+                                | PInt n1, VInt n2 -> if n1 = n2 then Some env else None 
+                                | PString s1, VString s2 -> if s1 = s2 then Some env else None 
+                                | PTuple ps, VTuple vs ->
+                                    if List.length ps <> List.length vs then None 
+                                    else let rec make_envr acc ps vs =
+                                      match ps, vs with
+                                      | [], [] -> Some acc
+                                      | p :: ps, v :: vs ->
+                                        (match match_patterns acc p v with
+                                        | None -> None
+                                        | Some envr -> make_envr envr ps vs)
+                                      | _ -> None
+                                    in make_envr env ps vs 
+                                | PCons (x, p), VCons (vx, v) -> 
+                                  if x <> vx then None 
+                                  else (match p, v with 
+                                        | None, None -> Some env  
+                                        | Some p1, Some v2 -> match_patterns env p1 v2 
+                                        | _ -> None 
+                                        ) 
+                                | _ -> None 
+                              in let v = loop environment e in 
+                              let rec check_branches branches = 
+                                match branches with 
+                                | [] -> raise (Match_fail exp.pos) 
+                                | (p, body) :: rest -> 
+                                    (match match_patterns environment p v with 
+                                    | None -> check_branches rest 
+                                    | Some envr -> loop envr body
+                                    ) 
+                              in check_branches branches 
+    in loop env e *) 
+      | _ -> assert false 
+    in loop ctxt e 
+
+
+
+
 
 let rec nub l =
   match l with
