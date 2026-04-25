@@ -279,8 +279,8 @@ let eval_expr (env : dyn_env) (e : Ast.Expr.t) : value =
                                   | Add -> VInt (v1 + v2)
                                   | Sub -> VInt (v1 - v2)
                                   | Mul -> VInt (v1 * v2)
-                                  | Div -> if v2 = 0 then raise Div_by_zero else VInt (v1 / v2) 
-                                  | Mod -> if v2 = 0 then raise Div_by_zero else VInt (v1 mod v2) 
+                                  | Div -> if v2 = 0 then raise (Div_by_zero exp.pos) else VInt (v1 / v2) 
+                                  | Mod -> if v2 = 0 then raise (Div_by_zero exp.pos) else VInt (v1 mod v2) 
                                   | Lt  -> VBool (v1 < v2)
                                   | Lte -> VBool (v1 <= v2)
                                   | Gt  -> VBool (v1 > v2)
@@ -302,7 +302,7 @@ let eval_expr (env : dyn_env) (e : Ast.Expr.t) : value =
                                 )
                             | VString v1, VString v2 ->
                                   (match bop with
-                                    | Contact -> VString (v1 ^ vs)
+                                    | Concat -> VString (v1 ^ v2)
                                     | _ -> assert false)
                             | v1, v2 -> 
                                   (match bop with 
@@ -319,10 +319,10 @@ let eval_expr (env : dyn_env) (e : Ast.Expr.t) : value =
                           | VBool false -> loop environment e3
                           | _ -> assert false 
                           )      
-    | Annot (e, t) -> loop environment e 
+    | Annot (e, _) -> loop environment e 
     | Assert e -> (match loop environment e with 
                     | VBool (true)  -> VUnit
-                    | VBool (false) -> raise Assert_fail
+                    | VBool (false) -> raise (Assert_fail exp.pos)
                     | _ -> assert false  
                     ) 
     | Tuple e_list -> VTuple (List.map (loop environment) e_list) 
@@ -338,22 +338,23 @@ let eval_expr (env : dyn_env) (e : Ast.Expr.t) : value =
                       | VClos {env = env2; name; arg = x; body} ->
                           let env3 = Env.add x v2 env2 in
                           let env3 = match name with
-                            | Some n -> Env.add n (Vclos {env = env2; name; arg=x; body}) env3
+                            | Some n -> Env.add n (VClos {env = env2; name; arg=x; body}) env3
                             | None   -> env3
                           in
                           loop env3 body
                       | _ -> assert false) 
-    | Let {is_rec; name = x; binding = e1; body = 2} -> if is_rec then 
+    | Let {is_rec; name = x; binding = e1; body = e2} -> if is_rec then 
                                                             (match e1.expr with
                                                             | Fun ((arg, _), e) ->
-                                                              let env2 = Env.add x (VClos { environment; name = Some x; arg; body = e }) environment in
+                                                              let env2 = Env.add x (VClos { env=environment; name = Some x; arg; body = e }) environment in
                                                               loop env2 e2
                                                             | _ ->
                                                               let v1 = loop environment e1 in
                                                               loop (Env.add x v1 environment) e2)
                                                         else let v1 = loop environment e1 in 
                                                               loop (Env.add x v1 environment) e2  
-    | Match (e, branches) -> assert false 
+    | Match (_, _) -> assert false 
+  in loop env e
 
 let eval (p : stmt list) : value =
   let rec go env v p =
