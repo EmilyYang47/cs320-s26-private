@@ -233,7 +233,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                           | _, _, Error e -> Error e 
                           )                  
     | Annot (e, t) -> (match loop context e with 
-                      | Ok (ty, _) -> Ok (t, [(ty, t)]) 
+                      | Ok (ty, c) -> Ok (t, (ty, t) :: c) 
                       | Error e -> Error e  
                       ) 
     | Assert e -> (match loop context e with 
@@ -308,68 +308,71 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
   in loop env e *) 
     | _ -> assert false 
   in 
-  let rec apply_subst (s : (string * ty) list) (t : ty) : ty =
-  match t with
-  | TParam a ->
-    (match List.assoc_opt a s with
-     | Some t' -> apply_subst s t'
-     | None    -> TParam a)
-  | TFun (t1, t2) -> TFun (apply_subst s t1, apply_subst s t2)
-  | TTuple ts     -> TTuple (List.map (apply_subst s) ts)
-  | TAdt (ts, n)  -> TAdt (List.map (apply_subst s) ts, n)
-  | t -> t 
+  let rec substitute_unification (s : (string * ty) list) (t : ty) : ty = 
+    let rec lookup key lst =
+      match lst with
+      | [] -> None
+      | (k, v) :: rest ->
+          if k = key then Some v
+          else lookup key rest
+    in 
+    match t with
+    | TParam a -> (match lookup a s with
+                  | Some v -> substitute_unification s v
+                  | None    -> TParam a
+                  )
+    | TFun (t1, t2) -> TFun (substitute_unification s t1, substitute_unification s t2)
+    | TTuple ts     -> TTuple (List.map (substitute_unification s) ts)
+    | TAdt (ts, n)  -> TAdt (List.map (substitute_unification s) ts, n)
+    | t -> t 
   in 
-  (* let unification (constraints : constr list) : (string * ty) list = 
-    let loop acc constrs = 
-      match constrs with 
-      | [] -> acc 
+  let rec apply_substitution (kv : string * ty) (ty : ty) : ty =
+    let (a, replacement) = kv in
+    match ty with
+    | TParam b -> if b = a then replacement else TParam b
+    | TFun (t1, t2) -> TFun (apply_substitution kv t1, apply_substitution kv t2)
+    | TTuple ts     -> TTuple (List.map (apply_substitution kv) ts)
+    | TAdt (ts, n)  -> TAdt (List.map (apply_substitution kv) ts, n)
+    | t -> t
+  in 
+  let unification (constraints : constr list) : ((string * ty) list, Error_msg.t) result = 
+    let rec loop acc constraint_set = 
+      match constraint_set with 
+      | [] -> Ok (acc)  
       | (t1, t2) :: cs -> if t1 = t2 then loop acc cs 
                           else (match (t1, t2) with 
                                   | TFun (s1, t1), TFun (s2, t2) -> loop acc ((s1, s2) :: (t1, t2) :: cs) 
                                   | TParam a, t | t, TParam a -> if not (List.mem a (free_vars t)) then 
-                                                                  let rest = List.map (fun (l, r) -> (apply_subst [(a, t)] l, apply_subst [(a, t)] r)) rest in
-                                                                  loop ((a, t) :: subst) rest 
-                                                                  else Error (exp_ty dummy_pos t1 t2)  
-                                  | _ -> Error (exp_ty dummy_pos t1 t2) 
-                          )
-
-
-
-
-
-    in loop [] constraints  *) 
-  let unification (constraints : constr list) : ((string * ty) list, Error_msg.t) result =
-    let rec loop (subst : (string * ty) list) (cs : constr list) =
-      match cs with
-      | [] -> Ok subst
-      | (t1, t2) :: rest when t1 = t2 ->
-        loop subst rest
-      | (TFun (s1, t1), TFun (s2, t2)) :: rest ->
-        loop subst ((s1, s2) :: (t1, t2) :: rest)
-      | (TTuple ts1, TTuple ts2) :: rest when List.length ts1 = List.length ts2 ->
-        loop subst (List.combine ts1 ts2 @ rest)
-      | (TAdt (ts1, n1), TAdt (ts2, n2)) :: rest when n1 = n2 ->
-        loop subst (List.combine ts1 ts2 @ rest)
-      | (TParam a, t) :: rest
-        when not (List.mem a (free_vars t)) ->
-        let rest' = List.map (fun (l, r) ->
-          (apply_subst [(a, t)] l, apply_subst [(a, t)] r)) rest in
-        loop ((a, t) :: subst) rest'
-      | (t, TParam a) :: rest
-        when not (List.mem a (free_vars t)) ->
-        let rest' = List.map (fun (l, r) ->
-          (apply_subst [(a, t)] l, apply_subst [(a, t)] r)) rest in
-        loop ((a, t) :: subst) rest'
-      | (t1, t2) :: _ ->
-        Error (exp_ty dummy_pos t1 t2)
-    in
-    loop [] constraints
+                                                                  let rest = List.map (fun (l, r) -> (apply_substitution (a, t) l, apply_substitution (a, t) r)) cs in
+                                                                  loop ((a, t) :: acc) rest 
+                                                                  else Error dummy_error 
+                                  | TTuple a, TTuple b -> if List.length a = List.length b 
+                                                          then let rec zip acc tp1 tp2 = 
+                                                            match tp1, tp2 with
+                                                            | [], [] -> acc
+                                                            | a::a_rest, b::b_rest -> (a, b) :: zip acc a_rest b_rest 
+                                                            | _ -> assert false 
+                                                          in let combined = zip [] a b 
+                                                          in loop acc (combined @ cs)   
+                                                          else Error dummy_error                    
+                                  | TAdt (ts1, n1), TAdt (ts2, n2) -> if n1 = n2  
+                                                                      then let rec zip acc ts1 ts2 = 
+                                                                        match ts1, ts2 with
+                                                                        | [], [] -> acc
+                                                                        | a::a_rest, b::b_rest -> (a, b) :: zip acc a_rest b_rest 
+                                                                        | _ -> assert false 
+                                                                      in let combined = zip [] ts1 ts2 
+                                                                      in loop acc (combined @ cs)    
+                                                                      else Error dummy_error           
+                                  | _ -> Error dummy_error 
+                          ) 
+    in loop [] constraints   
   in 
   match loop ctxt e with 
   | Ok ((ty, constrs)) -> (match unification constrs with 
-                          | Ok (subst) -> let ty' = apply_subst subst ty in 
-                                          let fvs = free_vars ty' in 
-                                          Ok (fvs, ty') 
+                          | Ok (set) -> let substituted_ty = substitute_unification set ty in 
+                                          let free_variables = free_vars substituted_ty in 
+                                          Ok (free_variables, substituted_ty) 
                           | Error e -> Error e 
                           ) 
   | Error e -> Error e 
