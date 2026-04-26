@@ -297,7 +297,8 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                                                                     | TFun (arg_ty, ret_ty) -> (match loop context e with 
                                                                                               | Error e -> Error e 
                                                                                               | Ok (te, ce) -> Ok (ret_ty, (te, arg_ty) :: ce)  )                                                 
-                                                                    | _ -> Error (cons_exp_no_args exp.pos name))) 
+                                                                    | TAdt _ -> Error (cons_exp_no_args exp.pos name)
+                                                                    | _ -> Error (unknown_cons exp.pos name))) 
                                 ) 
     (* | Fun ((arg, _), e) -> VClos {env = environment; name = None; arg=arg; body=e}  *)
     
