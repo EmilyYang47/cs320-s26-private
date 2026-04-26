@@ -495,11 +495,56 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                           ) 
     in loop [] constraints   
   in 
+  let normalization free_variables substituted_ty = 
+    let alpha_names = ["a";"b";"c";"d";"e";"f";"g";"h";"i";"j";"k";"l";"m";"n";"o";"p";"q";"r";"s";"t";"u";"v";"w";"x";"y";"z"] in
+    let rec build_substitution_mapping t current_mapping remaining_alpha_names =
+      match t with
+      | TParam a -> let rec is_visited key lst =
+                      match lst with
+                      | [] -> false
+                      | (k, _) :: rest ->
+                          if k = key then true
+                          else is_visited key rest 
+                    in 
+                    if List.mem a free_variables && not (is_visited a current_mapping) then
+                      (match remaining_alpha_names with
+                      | [] -> (current_mapping, [])
+                      | n :: rest -> ((a, n) :: current_mapping, rest))
+                    else (current_mapping, remaining_alpha_names)
+      | TFun (t1, t2) -> let (mapping, remaining_names) = build_substitution_mapping t1 current_mapping remaining_alpha_names in
+                          build_substitution_mapping t2 mapping remaining_names
+      | TTuple ts -> List.fold_left (fun (mapping, remaining_names) t -> build_substitution_mapping t mapping remaining_names) (current_mapping, remaining_alpha_names) ts 
+      | TAdt (ts, _) -> List.fold_left (fun (mapping, remaining_names) t -> build_substitution_mapping t mapping remaining_names) (current_mapping, remaining_alpha_names) ts
+      | _ -> (current_mapping, remaining_alpha_names)
+    in
+    let (mapping_rev, _) = build_substitution_mapping substituted_ty [] alpha_names in
+    let mapping = List.rev mapping_rev in
+    let rec rename t =
+      match t with
+      | TParam a -> let rec lookup k lst =
+                      match lst with
+                      | [] -> None
+                      | (a, b) :: rest -> if a = k then Some (b) else lookup k rest 
+                    in
+                    (match lookup a mapping with
+                      | Some b -> TParam b
+                      | None -> TParam a 
+                    )
+      | TFun (t1, t2) -> TFun (rename t1, rename t2)
+      | TTuple ts     -> TTuple (List.map rename ts)
+      | TAdt (ts, n)  -> TAdt (List.map rename ts, n)
+      | t -> t
+    in
+    let renamed_ty = rename substituted_ty in 
+    let new_fvs = List.map (fun (_, b) -> b) mapping in
+    (renamed_ty, new_fvs)
+  in 
   match loop ctxt e with 
   | Ok ((ty, constrs)) -> (match unification constrs with 
                           | Ok (set) -> let substituted_ty = substitute_unification set ty in 
                                           let free_variables = free_vars substituted_ty in 
-                                          Ok (free_variables, substituted_ty) 
+                                          let (renamed_ty, new_fvs) = normalization free_variables substituted_ty in 
+                                          Ok (new_fvs, renamed_ty) 
                           | Error e -> Error e 
                           ) 
   | Error e -> Error e 
