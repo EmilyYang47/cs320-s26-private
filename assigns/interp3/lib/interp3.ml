@@ -240,14 +240,68 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                     | Ok (t, c) -> Ok (TUnit, (t, TBool) :: c) 
                     | Error e -> Error e  
                     ) 
-    (* | Tuple e_list -> VTuple (List.map (loop environment) e_list) 
-    | Cons (name, e_option) -> (match e_option with 
-                              | None -> VCons (name, None) 
-                              | Some e -> VCons (name, Some (loop environment e)) 
-                              ) 
-    | Fun ((arg, _), e) -> VClos {env = environment; name = None; arg=arg; body=e} 
+    | Tuple e_list -> let rec collect acc e_list = 
+                        match e_list with 
+                        | [] -> Ok (List.rev acc) 
+                        | e :: es -> (match loop context e with  
+                                      | Error e -> Error e 
+                                      | Ok (t, c) -> collect ((t, c) :: acc) es 
+                                      ) 
+                      in 
+                      (match collect [] e_list with 
+                      | Error e -> Error e 
+                      | Ok (tc_lst) -> let ts = List.map (fun (t, _) -> t) tc_lst in 
+                                        let rec get_cs lst =
+                                          match lst with
+                                          | [] -> []
+                                          | (_, c) :: rest -> c @ get_cs rest
+                                        in 
+                                        let cs = get_cs tc_lst in 
+                                        Ok (TTuple ts, cs) 
+                      ) 
+    | Cons (name, e_option) -> let rec zip acc als bs = 
+                                  match als, bs with
+                                  | [], [] -> acc
+                                  | a::a_rest, b::b_rest -> (a, b) :: zip acc a_rest b_rest 
+                                  | _ -> assert false 
+                                in
+                                let rec lookup al lst =
+                                  match lst with
+                                  | [] -> None
+                                  | (a, b) :: abs -> if a = al then Some (b) else lookup al abs
+                                in 
+                                let rec subs_a_with_b al_b_set ty  = 
+                                  match ty with 
+                                  | TParam a -> ( match lookup a al_b_set with
+                                                  | Some b -> b
+                                                  | None -> TParam a 
+                                                )
+                                  | TFun (t1, t2) -> TFun (subs_a_with_b al_b_set t1 , subs_a_with_b al_b_set t2 )
+                                  | TTuple ts     -> TTuple (List.map (subs_a_with_b al_b_set) ts)
+                                  | TAdt (ts, n)  -> TAdt (List.map (subs_a_with_b al_b_set) ts, n)
+                                  | t -> t
+                                in
+                                (match e_option with 
+                                | None -> (match Env.find_opt name context with
+                                          | None -> Error (unknown_cons exp.pos name)
+                                          | Some (alphas, ty) -> let betas = List.map (fun _ -> fresh ()) alphas in
+                                                                let al_b_set = zip [] alphas betas in  
+                                                                (match subs_a_with_b al_b_set ty with
+                                                                  | TAdt (a, b) -> Ok (TAdt (a, b), [])
+                                                                  | _ -> Error (cons_exp_args exp.pos name)))
+                                | Some e -> (match Env.find_opt name context with
+                                            | None -> Error (unknown_cons exp.pos name)
+                                            | Some (alphas, ty) -> let betas = List.map (fun _ -> fresh ()) alphas in
+                                                                  let al_b_set = zip [] alphas betas in
+                                                                  (match subs_a_with_b al_b_set ty with
+                                                                    | TFun (arg_ty, ret_ty) -> (match loop context e with 
+                                                                                              | Error e -> Error e 
+                                                                                              | Ok (te, ce) -> Ok (ret_ty, (te, arg_ty) :: ce)  )                                                 
+                                                                    | _ -> Error (cons_exp_no_args exp.pos name))) 
+                                ) 
+    (* | Fun ((arg, _), e) -> VClos {env = environment; name = None; arg=arg; body=e}  *)
     
-    | App (e1, e2) -> let v1 = loop environment e1 in
+    (* | App (e1, e2) -> let v1 = loop environment e1 in
                       let v2 = loop environment e2 in
                       (match v1 with
                       | VClos {env = env2; name; arg = x; body} ->
@@ -317,7 +371,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
           else lookup key rest
     in 
     match t with
-    | TParam a -> (match lookup a s with
+    | TParam a -> (match lookup a s with (* see if can further substitute *) 
                   | Some v -> substitute_unification s v
                   | None    -> TParam a
                   )
