@@ -563,7 +563,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
           | Ok (t_pat, c_pat, ctx') ->
             (match loop ctx' body with
              | Error e -> Error e
-             | Ok (t_body, c_body) ->
+             | Ok (_, c_body) ->
                check_branches rest t_scrut
                  ((t_scrut, t_pat) :: c_pat @ c_body @ acc_c)))
      in
