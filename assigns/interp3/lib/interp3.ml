@@ -334,45 +334,8 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                                                                                 | Ok (t2, c2) -> Ok (t2, c1 @ c2) 
                                                                               ) 
                                                             )   
-    (* | Match (e, branches) -> let rec match_patterns (env : dyn_env) (p : pattern) (v : value) : dyn_env option = 
-                                match p.pattern, v with 
-                                | PWild, _ -> Some env 
-                                | PVar x, v -> Some (Env.add x v env) 
-                                | PUnit, VUnit -> Some env 
-                                | PBool b1, VBool b2 -> if b1 = b2 then Some env else None  
-                                | PInt n1, VInt n2 -> if n1 = n2 then Some env else None 
-                                | PString s1, VString s2 -> if s1 = s2 then Some env else None 
-                                | PTuple ps, VTuple vs ->
-                                    if List.length ps <> List.length vs then None 
-                                    else let rec make_envr acc ps vs =
-                                      match ps, vs with
-                                      | [], [] -> Some acc
-                                      | p :: ps, v :: vs ->
-                                        (match match_patterns acc p v with
-                                        | None -> None
-                                        | Some envr -> make_envr envr ps vs)
-                                      | _ -> None
-                                    in make_envr env ps vs 
-                                | PCons (x, p), VCons (vx, v) -> 
-                                  if x <> vx then None 
-                                  else (match p, v with 
-                                        | None, None -> Some env  
-                                        | Some p1, Some v2 -> match_patterns env p1 v2 
-                                        | _ -> None 
-                                        ) 
-                                | _ -> None 
-                              in let v = loop environment e in 
-                              let rec check_branches branches = 
-                                match branches with 
-                                | [] -> raise (Match_fail exp.pos) 
-                                | (p, body) :: rest -> 
-                                    (match match_patterns environment p v with 
-                                    | None -> check_branches rest 
-                                    | Some envr -> loop envr body
-                                    ) 
-                              in check_branches branches 
-  in loop env e *) 
-    (* | Match (e, branches) -> let rec match_patterns (context : ctxt) (p : pattern) : (ty * constr list * ctxt, Error_msg.t) result = 
+
+    | Match (e, branches) -> let rec match_patterns (context : ctxt) (p : pattern) : (ty * constr list * ctxt, Error_msg.t) result = 
                                 let rec zip acc als bs = 
                                   match als, bs with
                                   | [], [] -> acc
@@ -444,7 +407,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
 
                               in 
                               (match loop context e with
-                              | Error e -> Error e
+                              | Error err -> Error err
                               | Ok (t_scrut, c_scrut) ->
                                 let rec check_branches branches =
                                   match branches with
@@ -456,7 +419,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                                         (match loop ctx' body with
                                         | Error e -> Error e
                                         | Ok (t_body, c_body) ->
-                                          Ok (t_body, c_scrut @ [(t_scrut, t_pat)] @ c_pat @ c_body)))
+                                          Ok (t_body, [(t_scrut, t_pat)] @ c_pat @ c_body)))
                                   | (p, body) :: rest ->
                                     (match match_patterns context p with
                                       | Error e -> Error e
@@ -467,10 +430,16 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                                           (match check_branches rest with
                                             | Error e -> Error e
                                             | Ok (t_rest, c_rest) ->
-                                              Ok (t_rest, c_scrut @ [(t_scrut, t_pat)] @ c_pat @ c_body @ [(t_body, t_rest)] @ c_rest))))
+                                              Ok (t_rest, [(t_scrut, t_pat)] @ c_pat @ c_body @ [(t_body, t_rest)] @ c_rest))))
                                 in
-                                check_branches branches) *)
-      | Match (e, branches) ->
+                                (match check_branches branches with
+                                  | Error e -> Error e
+                                  | Ok (t_out, c_branches) ->
+                                    Ok (t_out, c_scrut @ c_branches)))  
+      
+      
+      
+                                (* | Match (e, branches) ->
   (match loop context e with
    | Error err -> Error err
    | Ok (t_scrut, c_scrut) ->
@@ -570,7 +539,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
      (match check_branches branches t_scrut [] with
       | Error e -> Error e
       | Ok (t_out, c_branches) ->
-        Ok (t_out, c_scrut @ c_branches)))
+        Ok (t_out, c_scrut @ c_branches))) *)
   in 
   let rec substitute_unification (s : (string * ty) list) (t : ty) : ty = 
     let rec lookup key lst =
