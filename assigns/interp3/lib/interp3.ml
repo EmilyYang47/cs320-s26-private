@@ -259,7 +259,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                                         let cs = get_cs tc_lst in 
                                         Ok (TTuple ts, cs) 
                       ) 
-    | Cons (name, e_option) -> let rec zip acc als bs = 
+    | Cons (name, e) -> let rec zip acc als bs = 
                                   match als, bs with
                                   | [], [] -> acc
                                   | a::a_rest, b::b_rest -> (a, b) :: zip acc a_rest b_rest 
@@ -281,7 +281,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                                   | TAdt (ts, n)  -> TAdt (List.map (subs_a_with_b al_b_set) ts, n)
                                   | t -> t
                                 in
-                                (match e_option with 
+                                (match e with 
                                 | None -> (match Env.find_opt name context with
                                           | None -> Error (unknown_cons exp.pos name)
                                           | Some (alphas, ty) -> let betas = List.map (fun _ -> fresh ()) alphas in
@@ -299,30 +299,42 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                                                                                               | Ok (te, ce) -> Ok (ret_ty, (te, arg_ty) :: ce)  )                                                 
                                                                     | _ -> Error (cons_exp_no_args exp.pos name))) 
                                 ) 
-    (* | Fun ((arg, _), e) -> VClos {env = environment; name = None; arg=arg; body=e}  *)
-    
-    (* | App (e1, e2) -> let v1 = loop environment e1 in
-                      let v2 = loop environment e2 in
-                      (match v1 with
-                      | VClos {env = env2; name; arg = x; body} ->
-                          let env3 = Env.add x v2 env2 in
-                          let env3 = match name with
-                            | Some n -> Env.add n (VClos {env = env2; name; arg=x; body}) env3
-                            | None   -> env3
-                          in
-                          loop env3 body
-                      | _ -> assert false) 
+    | Fun ((arg, ty), e) -> (match ty with
+                            | None -> let alpha = fresh () in (* FUN *)
+                                      let new_ctxt = Env.add arg ([], alpha) context in
+                                      (match loop new_ctxt e with
+                                        | Error e -> Error e
+                                        | Ok (t, c) -> Ok (TFun (alpha, t), c))
+                            | Some t1 -> let new_ctxt = Env.add x ([], t1) context in (* FUNANNOT *)
+                                        (match loop ctx' e with
+                                          | Error e -> Error e
+                                          | Ok (t2, c) -> Ok (TFun (t1, t2), c))) 
+    | App (e1, e2) -> (match loop context e1, loop context e2 with
+                      | Error e, _ -> Error e
+                      | _, Error e -> Error e
+                      | Ok (t1, c1), Ok (t2, c2) -> let alpha = fresh () in
+                                                    Ok (alpha, (t1, TFun (t2, alpha)) :: c1 @ c2)
+                      ) 
     | Let {is_rec; name = x; binding = e1; body = e2} -> if is_rec then 
-                                                            (match e1.expr with
-                                                            | Fun ((arg, _), e) ->
-                                                              let env2 = Env.add x (VClos { env=environment; name = Some x; arg; body = e }) environment in
-                                                              loop env2 e2
-                                                            | _ ->
-                                                              let v1 = loop environment e1 in
-                                                              loop (Env.add x v1 environment) e2)
-                                                        else let v1 = loop environment e1 in 
-                                                              loop (Env.add x v1 environment) e2  
-    | Match (e, branches) -> let rec match_patterns (env : dyn_env) (p : pattern) (v : value) : dyn_env option = 
+                                                            let alpha = fresh () in
+                                                            let ctxt1 = Env.add f ([], alpha) context in 
+                                                            (match loop ctxt1 e1 with
+                                                            | Error e -> Error e
+                                                            | Ok (t1, c1) -> let ctxt2 = Env.add f ([], t1) context in
+                                                                            (match loop ctxt2 e2 with
+                                                                              | Error e -> Error e
+                                                                              | Ok (t2, c2) -> Ok (t2, (alpha, t1) :: c1 @ c2)
+                                                                            )
+                                                            ) 
+                                                        else (match loop context e1 with
+                                                              | Error e -> Error e
+                                                              | Ok (t1, c1) -> let new_ctxt = Env.add x ([], t1) context in
+                                                                              (match loop ctx' e2 with
+                                                                                | Error e -> Error e
+                                                                                | Ok (t2, c2) -> Ok (t2, c1 @ c2) 
+                                                                              ) 
+                                                            )   
+    (* | Match (e, branches) -> let rec match_patterns (env : dyn_env) (p : pattern) (v : value) : dyn_env option = 
                                 match p.pattern, v with 
                                 | PWild, _ -> Some env 
                                 | PVar x, v -> Some (Env.add x v env) 
@@ -392,7 +404,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
   let unification (constraints : constr list) : ((string * ty) list, Error_msg.t) result = 
     let rec loop acc constraint_set = 
       match constraint_set with 
-      | [] -> Ok (List.rev acc)  
+      | [] -> Ok (acc)  
       | (t1, t2) :: cs -> if t1 = t2 then loop acc cs 
                           else (match (t1, t2) with 
                                   | TFun (s1, t1), TFun (s2, t2) -> loop acc ((s1, s2) :: (t1, t2) :: cs) 
