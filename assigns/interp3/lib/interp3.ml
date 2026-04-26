@@ -305,8 +305,8 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                                       (match loop new_ctxt e with
                                         | Error e -> Error e
                                         | Ok (t, c) -> Ok (TFun (alpha, t), c))
-                            | Some t1 -> let new_ctxt = Env.add x ([], t1) context in (* FUNANNOT *)
-                                        (match loop ctx' e with
+                            | Some t1 -> let new_ctxt = Env.add arg ([], t1) context in (* FUNANNOT *)
+                                        (match loop new_ctxt e with
                                           | Error e -> Error e
                                           | Ok (t2, c) -> Ok (TFun (t1, t2), c))) 
     | App (e1, e2) -> (match loop context e1, loop context e2 with
@@ -317,10 +317,10 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                       ) 
     | Let {is_rec; name = x; binding = e1; body = e2} -> if is_rec then 
                                                             let alpha = fresh () in
-                                                            let ctxt1 = Env.add f ([], alpha) context in 
+                                                            let ctxt1 = Env.add x ([], alpha) context in 
                                                             (match loop ctxt1 e1 with
                                                             | Error e -> Error e
-                                                            | Ok (t1, c1) -> let ctxt2 = Env.add f ([], t1) context in
+                                                            | Ok (t1, c1) -> let ctxt2 = Env.add x ([], t1) context in
                                                                             (match loop ctxt2 e2 with
                                                                               | Error e -> Error e
                                                                               | Ok (t2, c2) -> Ok (t2, (alpha, t1) :: c1 @ c2)
@@ -329,7 +329,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                                                         else (match loop context e1 with
                                                               | Error e -> Error e
                                                               | Ok (t1, c1) -> let new_ctxt = Env.add x ([], t1) context in
-                                                                              (match loop ctx' e2 with
+                                                                              (match loop new_ctxt e2 with
                                                                                 | Error e -> Error e
                                                                                 | Ok (t2, c2) -> Ok (t2, c1 @ c2) 
                                                                               ) 
