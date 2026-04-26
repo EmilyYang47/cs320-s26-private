@@ -367,7 +367,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                                 | PString _ -> Ok (TString, [], context) 
                                 | PTuple ps -> let rec make_pattern_dependencies acc_ts acc_cs ctxt ps =
                                                   match ps with
-                                                  | [] -> Ok (List.rev acc_ts, acc_cs, ctxt)
+                                                  | [] -> Ok (List.rev acc_ts, List.rev acc_cs, ctxt)
                                                   | p :: rest ->
                                                     (match match_patterns ctxt p with
                                                     | Error e -> Error e
@@ -408,138 +408,32 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                               in 
                               (match loop context e with
                               | Error err -> Error err
-                              | Ok (t_scrut, c_scrut) ->
-                                let rec check_branches branches =
-                                  match branches with
-                                  | [] -> Error dummy_error
-                                  | [(p, body)] ->
-                                    (match match_patterns context p with
-                                      | Error e -> Error e
-                                      | Ok (t_pat, c_pat, ctx') ->
-                                        (match loop ctx' body with
-                                        | Error e -> Error e
-                                        | Ok (t_body, c_body) ->
-                                          Ok (t_body, [(t_scrut, t_pat)] @ c_pat @ c_body)))
-                                  | (p, body) :: rest ->
-                                    (match match_patterns context p with
-                                      | Error e -> Error e
-                                      | Ok (t_pat, c_pat, ctx') ->
-                                        (match loop ctx' body with
-                                        | Error e -> Error e
-                                        | Ok (t_body, c_body) ->
-                                          (match check_branches rest with
-                                            | Error e -> Error e
-                                            | Ok (t_rest, c_rest) ->
-                                              Ok (t_rest, [(t_scrut, t_pat)] @ c_pat @ c_body @ [(t_body, t_rest)] @ c_rest))))
-                                in
-                                (match check_branches branches with
-                                  | Error e -> Error e
-                                  | Ok (t_out, c_branches) ->
-                                    Ok (t_out, c_scrut @ c_branches)))  
-      
-      
-      
-                                (* | Match (e, branches) ->
-  (match loop context e with
-   | Error err -> Error err
-   | Ok (t_scrut, c_scrut) ->
-     (* type_pat: pattern -> (ty * constr list * ctxt, Error_msg.t) result *)
-     let rec type_pat (ctx : ctxt) (p : pattern) 
-         : (ty * constr list * ctxt, Error_msg.t) result =
-       match p.pattern with
-       | PWild ->
-         let alpha = fresh () in
-         Ok (alpha, [], ctx)
-       | PVar x ->
-         let alpha = fresh () in
-         Ok (alpha, [], Env.add x ([], alpha) ctx)
-       | PUnit  -> Ok (TUnit, [], ctx)
-       | PBool _ -> Ok (TBool, [], ctx)
-       | PInt _  -> Ok (TInt, [], ctx)
-       | PString _ -> Ok (TString, [], ctx)
-       | PTuple ps ->
-         let rec go ctx ps =
-           match ps with
-           | [] -> Ok ([], [], ctx)
-           | p :: rest ->
-             (match type_pat ctx p with
-              | Error e -> Error e
-              | Ok (t, c, ctx') ->
-                (match go ctx' rest with
-                 | Error e -> Error e
-                 | Ok (ts, cs, ctx'') -> Ok (t :: ts, c @ cs, ctx'')))
-         in
-         (match go ctx ps with
-          | Error e -> Error e
-          | Ok (ts, cs, ctx') -> Ok (TTuple ts, cs, ctx'))
-       | PCons (name, None) ->
-         (match Env.find_opt name ctx with
-          | None -> Error (unknown_cons p.pos name)
-          | Some (alphas, ty) ->
-            let betas = List.map (fun _ -> fresh ()) alphas in
-            let subst = List.combine alphas betas in
-            let rec inst t =
-              match t with
-              | TParam a -> (match List.assoc_opt a subst with
-                             | Some b -> b | None -> TParam a)
-              | TFun (t1, t2) -> TFun (inst t1, inst t2)
-              | TTuple ts -> TTuple (List.map inst ts)
-              | TAdt (ts, n) -> TAdt (List.map inst ts, n)
-              | t -> t
-            in
-            (match inst ty with
-             | TAdt _ as t -> Ok (t, [], ctx)
-             | _ -> Error (cons_exp_args p.pos name)))
-       | PCons (name, Some p') ->
-         (match Env.find_opt name ctx with
-          | None -> Error (unknown_cons p.pos name)
-          | Some (alphas, ty) ->
-            let betas = List.map (fun _ -> fresh ()) alphas in
-            let subst = List.combine alphas betas in
-            let rec inst t =
-              match t with
-              | TParam a -> (match List.assoc_opt a subst with
-                             | Some b -> b | None -> TParam a)
-              | TFun (t1, t2) -> TFun (inst t1, inst t2)
-              | TTuple ts -> TTuple (List.map inst ts)
-              | TAdt (ts, n) -> TAdt (List.map inst ts, n)
-              | t -> t
-            in
-            (match inst ty with
-             | TFun (arg_ty, ret_ty) ->
-               (match type_pat ctx p' with
-                | Error e -> Error e
-                | Ok (tp, cp, ctx') ->
-                  Ok (ret_ty, (tp, arg_ty) :: cp, ctx'))
-             | TAdt _ -> Error (cons_exp_no_args p.pos name)
-             | _ -> Error (unknown_cons p.pos name)))
-     in
-     let rec check_branches branches t_scrut acc_c =
-       match branches with
-       | [] -> Error dummy_error
-       | [(p, body)] ->
-         (match type_pat context p with
-          | Error e -> Error e
-          | Ok (t_pat, c_pat, ctx') ->
-            (match loop ctx' body with
-             | Error e -> Error e
-             | Ok (t_body, c_body) ->
-               Ok (t_body,
-                   (t_scrut, t_pat) :: c_pat @ c_body @ acc_c)))
-       | (p, body) :: rest ->
-         (match type_pat context p with
-          | Error e -> Error e
-          | Ok (t_pat, c_pat, ctx') ->
-            (match loop ctx' body with
-             | Error e -> Error e
-             | Ok (_, c_body) ->
-               check_branches rest t_scrut
-                 ((t_scrut, t_pat) :: c_pat @ c_body @ acc_c)))
-     in
-     (match check_branches branches t_scrut [] with
-      | Error e -> Error e
-      | Ok (t_out, c_branches) ->
-        Ok (t_out, c_scrut @ c_branches))) *)
+                              | Ok (t_scrut, c_scrut) -> let rec check_branches branches =
+                                                            match branches with
+                                                            | [] -> Error dummy_error
+                                                            | [(p, body)] -> (match match_patterns context p with
+                                                                              | Error e -> Error e
+                                                                              | Ok (t_pat, c_pat, ctx') -> (match loop ctx' body with
+                                                                                                            | Error e -> Error e
+                                                                                                            | Ok (t_body, c_body) -> Ok (t_body, [(t_scrut, t_pat)] @ c_pat @ c_body)))
+                                                            | (p, body) :: rest -> (match match_patterns context p with
+                                                                                    | Error e -> Error e
+                                                                                    | Ok (t_pat, c_pat, ctx') -> (match loop ctx' body with
+                                                                                                                  | Error e -> Error e
+                                                                                                                  | Ok (t_body, c_body) -> (match check_branches rest with
+                                                                                                                                            | Error e -> Error e
+                                                                                                                                            | Ok (t_rest, c_rest) ->
+                                                                                                                                              Ok (t_rest, [(t_scrut, t_pat)] @ c_pat @ c_body @ [(t_body, t_rest)] @ c_rest)
+                                                                                                                                            )
+                                                                                                                  )
+                                                                                    )
+                                                          in
+                                                          (match check_branches branches with
+                                                            | Error e -> Error e
+                                                            | Ok (t_out, c_branches) ->
+                                                              Ok (t_out, c_scrut @ c_branches)
+                                                          )
+                                )  
   in 
   let rec substitute_unification (s : (string * ty) list) (t : ty) : ty = 
     let rec lookup key lst =
