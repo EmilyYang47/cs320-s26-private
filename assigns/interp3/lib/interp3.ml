@@ -297,8 +297,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                                                                     | TFun (arg_ty, ret_ty) -> (match loop context e with 
                                                                                               | Error e -> Error e 
                                                                                               | Ok (te, ce) -> Ok (ret_ty, (te, arg_ty) :: ce)  )                                                 
-                                                                    | TAdt _ -> Error (cons_exp_no_args exp.pos name)
-                                                                    | _ -> Error (unknown_cons exp.pos name))) 
+                                                                    | _ -> Error (cons_exp_no_args exp.pos name))) 
                                 ) 
     (* | Fun ((arg, _), e) -> VClos {env = environment; name = None; arg=arg; body=e}  *)
     
@@ -393,7 +392,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
   let unification (constraints : constr list) : ((string * ty) list, Error_msg.t) result = 
     let rec loop acc constraint_set = 
       match constraint_set with 
-      | [] -> Ok (acc)  
+      | [] -> Ok (List.rev acc)  
       | (t1, t2) :: cs -> if t1 = t2 then loop acc cs 
                           else (match (t1, t2) with 
                                   | TFun (s1, t1), TFun (s2, t2) -> loop acc ((s1, s2) :: (t1, t2) :: cs) 
