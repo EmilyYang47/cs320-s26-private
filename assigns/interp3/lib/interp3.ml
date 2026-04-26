@@ -413,7 +413,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                                   match branches with
                                   | [] -> Error dummy_error
                                   | [(p, body)] ->
-                                    (match type_pat context p with
+                                    (match match_patterns context p with
                                       | Error e -> Error e
                                       | Ok (t_pat, c_pat, ctx') ->
                                         (match loop ctx' body with
@@ -421,7 +421,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                                         | Ok (t_body, c_body) ->
                                           Ok (t_body, [(t_scrut, t_pat)] @ c_pat @ c_body)))
                                   | (p, body) :: rest ->
-                                    (match type_pat context p with
+                                    (match match_patterns context p with
                                       | Error e -> Error e
                                       | Ok (t_pat, c_pat, ctx') ->
                                         (match loop ctx' body with
