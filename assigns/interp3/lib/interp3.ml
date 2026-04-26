@@ -445,21 +445,31 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                               in 
                               (match loop context e with
                               | Error e -> Error e
-                              | Ok (t_scrut, c_scrut) -> let rec check_branches branches =  
-                                                            match branches with
-                                                            | [] -> Error dummy_error
-                                                            | (p, body) :: rest -> (match match_patterns context p with
-                                                                                    | Error e -> Error e
-                                                                                    | Ok (t_pat, c_pat, ctx') -> (match loop ctx' body with
-                                                                                                                  | Error e -> Error e
-                                                                                                                  | Ok (t_body, c_body) -> (match check_branches rest with
-                                                                                                                                            | Error _ -> Ok (t_body, c_scrut @ [(t_scrut, t_pat)] @ c_pat @ c_body)
-                                                                                                                                            | Ok (t_rest, c_rest) -> Ok (t_rest, c_scrut @ [(t_scrut, t_pat)] @ c_pat @ c_body @ [(t_body, t_rest)] @ c_rest)
-                                                                                                                                            )
-                                                                                                                  )
-                                                                                    )
-                                                          in check_branches branches
-                              )
+                              | Ok (t_scrut, c_scrut) ->
+                                let rec check_branches branches =
+                                  match branches with
+                                  | [] -> Error dummy_error
+                                  | [(p, body)] ->
+                                    (match match_patterns context p with
+                                      | Error e -> Error e
+                                      | Ok (t_pat, c_pat, ctx') ->
+                                        (match loop ctx' body with
+                                        | Error e -> Error e
+                                        | Ok (t_body, c_body) ->
+                                          Ok (t_body, c_scrut @ [(t_scrut, t_pat)] @ c_pat @ c_body)))
+                                  | (p, body) :: rest ->
+                                    (match match_patterns context p with
+                                      | Error e -> Error e
+                                      | Ok (t_pat, c_pat, ctx') ->
+                                        (match loop ctx' body with
+                                        | Error e -> Error e
+                                        | Ok (t_body, c_body) ->
+                                          (match check_branches rest with
+                                            | Error e -> Error e
+                                            | Ok (t_rest, c_rest) ->
+                                              Ok (t_rest, c_scrut @ [(t_scrut, t_pat)] @ c_pat @ c_body @ [(t_body, t_rest)] @ c_rest))))
+                                in
+                                check_branches branches)
   in 
   let rec substitute_unification (s : (string * ty) list) (t : ty) : ty = 
     let rec lookup key lst =
