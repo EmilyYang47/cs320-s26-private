@@ -236,10 +236,7 @@ let type_of_expr (ctxt : ctxt) (e : expr) : (ty_scheme, Error_msg.t) result =
                       | Ok (ty, c) -> Ok (t, (ty, t) :: c) 
                       | Error e -> Error e  
                       ) 
-    | Assert e -> (match loop context e with 
-                    | Ok (t, c) -> Ok (TUnit, (t, TBool) :: c) 
-                    | Error e -> Error e  
-                    ) 
+
     | Assert e -> (match e.expr with
                     | Bool false -> Ok (fresh (), [])   (* ASSERTFALSE *)
                     | _ -> (match loop context e with
